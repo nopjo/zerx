@@ -39,3 +39,5 @@ build
 .exe
 .zip
 bun.lock
+
+config.json
