@@ -1,0 +1,181 @@
+{
+  "ldPlayerPath": "D:\\LDPlayer\\LDPlayer9\\ldconsole.exe",
+  "resourceMonitorCache": [
+    {
+      "deviceId": "emulator-5556",
+      "packageName": "com.roblox.delta1",
+      "username": "J0nahhwAr3f",
+      "lastCheck": 1754048259907
+    },
+    {
+      "deviceId": "emulator-5556",
+      "packageName": "com.roblox.delta2",
+      "username": "J0nahhO5DBt",
+      "lastCheck": 1754048260273
+    },
+    {
+      "deviceId": "emulator-5556",
+      "packageName": "com.roblox.delta3",
+      "username": "J0nahhKWmVQ",
+      "lastCheck": 1754048260515
+    },
+    {
+      "deviceId": "emulator-5558",
+      "packageName": "com.roblox.delta1",
+      "username": "J0nahhP6VYc",
+      "lastCheck": 1754048261158
+    },
+    {
+      "deviceId": "emulator-5558",
+      "packageName": "com.roblox.delta2",
+      "username": "J0nahhl2NDS",
+      "lastCheck": 1754048261453
+    },
+    {
+      "deviceId": "emulator-5558",
+      "packageName": "com.roblox.delta3",
+      "username": "J0nahh14Ruj",
+      "lastCheck": 1754048261694
+    },
+    {
+      "deviceId": "emulator-5560",
+      "packageName": "com.roblox.delta1",
+      "username": "J0nahh11zhp",
+      "lastCheck": 1754048262345
+    },
+    {
+      "deviceId": "emulator-5560",
+      "packageName": "com.roblox.delta2",
+      "username": "J0nahhSRhYU",
+      "lastCheck": 1754048262593
+    },
+    {
+      "deviceId": "emulator-5560",
+      "packageName": "com.roblox.delta3",
+      "username": "J0nahhdYRfR",
+      "lastCheck": 1754048262858
+    },
+    {
+      "deviceId": "emulator-5562",
+      "packageName": "com.roblox.delta1",
+      "username": "J0nahhHcbFM",
+      "lastCheck": 1754048263532
+    },
+    {
+      "deviceId": "emulator-5562",
+      "packageName": "com.roblox.delta2",
+      "username": "J0nahheXkZ1",
+      "lastCheck": 1754048263814
+    },
+    {
+      "deviceId": "emulator-5562",
+      "packageName": "com.roblox.delta3",
+      "username": "J0nahhos5yT",
+      "lastCheck": 1754048264063
+    }
+  ],
+  "robloxLauncher": {
+    "usernameAssignments": [],
+    "instanceCache": [
+      {
+        "deviceId": "emulator-5554",
+        "packageName": "com.roblox.clienv",
+        "username": "J0nahhwAr3f",
+        "lastCookieCheck": 1754411518887
+      },
+      {
+        "deviceId": "emulator-5554",
+        "packageName": "com.roblox.clienw",
+        "username": "J0nahhO5DBt",
+        "lastCookieCheck": 1754411519303
+      },
+      {
+        "deviceId": "emulator-5554",
+        "packageName": "com.roblox.clienx",
+        "username": "J0nahhKWmVQ",
+        "lastCookieCheck": 1754411519552
+      },
+      {
+        "deviceId": "emulator-5556",
+        "packageName": "com.roblox.clienv",
+        "username": "J0nahhP6VYc",
+        "lastCookieCheck": 1754411519840
+      },
+      {
+        "deviceId": "emulator-5556",
+        "packageName": "com.roblox.clienw",
+        "username": "J0nahhl2NDS",
+        "lastCookieCheck": 1754411520090
+      },
+      {
+        "deviceId": "emulator-5556",
+        "packageName": "com.roblox.clienx",
+        "username": "J0nahh14Ruj",
+        "lastCookieCheck": 1754411520342
+      },
+      {
+        "deviceId": "emulator-5558",
+        "packageName": "com.roblox.clienv",
+        "username": "J0nahh11zhp",
+        "lastCookieCheck": 1754411520645
+      },
+      {
+        "deviceId": "emulator-5558",
+        "packageName": "com.roblox.clienw",
+        "username": "J0nahhSRhYU",
+        "lastCookieCheck": 1754411520903
+      },
+      {
+        "deviceId": "emulator-5558",
+        "packageName": "com.roblox.clienx",
+        "username": "J0nahhdYRfR",
+        "lastCookieCheck": 1754411521187
+      },
+      {
+        "deviceId": "emulator-5560",
+        "packageName": "com.roblox.clienv",
+        "username": "J0nahhHcbFM",
+        "lastCookieCheck": 1754406869365
+      },
+      {
+        "deviceId": "emulator-5560",
+        "packageName": "com.roblox.clienw",
+        "username": "J0nahheXkZ1",
+        "lastCookieCheck": 1754406869610
+      },
+      {
+        "deviceId": "emulator-5560",
+        "packageName": "com.roblox.clienx",
+        "username": "J0nahhos5yT",
+        "lastCookieCheck": 1754406869836
+      },
+      {
+        "deviceId": "emulator-5562",
+        "packageName": "com.roblox.clienv",
+        "username": "J0nahhHcbFM",
+        "lastCookieCheck": 1754411521486
+      },
+      {
+        "deviceId": "emulator-5562",
+        "packageName": "com.roblox.clienw",
+        "username": "J0nahheXkZ1",
+        "lastCookieCheck": 1754411521745
+      },
+      {
+        "deviceId": "emulator-5562",
+        "packageName": "com.roblox.clienx",
+        "username": "J0nahhos5yT",
+        "lastCookieCheck": 1754411521994
+      }
+    ],
+    "keepAliveInterval": 30,
+    "autoRebootInterval": 0,
+    "presenceCheckInterval": 5,
+    "deviceTimeoutSeconds": 15,
+    "defaultGame": {
+      "privateServerLink": "https://www.roblox.com/games/129827112113663/Prospecting?privateServerLinkCode=16722369624142095473086276806842",
+      "gameName": "Prospecting Private Server 1"
+    },
+    "gameTemplates": []
+  }
+}
