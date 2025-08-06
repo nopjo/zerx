@@ -54,7 +54,7 @@ const EXECUTORS: ExecutorInfo[] = [
 ];
 
 function escapeShellArg(arg: string): string {
-  return `'${arg.replace(/'/g, "'\"'\"'")}'`;
+  return `"${arg.replace(/"/g, '\\"')}"`;
 }
 
 async function checkExecutorExists(
@@ -63,27 +63,19 @@ async function checkExecutorExists(
 ): Promise<boolean> {
   try {
     const methods = [
-      `ls -d ${escapeShellArg(executorPath)} 2>/dev/null && echo 'EXISTS'`,
-
-      `test -d ${escapeShellArg(executorPath)} && echo 'EXISTS'`,
-
-      `cd ${escapeShellArg(executorPath)} 2>/dev/null && echo 'EXISTS'`,
-
-      `find ${escapeShellArg(executorPath)} -maxdepth 0 -type d 2>/dev/null | head -1`,
+      `ls -d "${executorPath}" 2>/dev/null && echo 'EXISTS'`,
+      `test -d "${executorPath}" && echo 'EXISTS'`,
+      `cd "${executorPath}" 2>/dev/null && echo 'EXISTS'`,
     ];
 
     for (const method of methods) {
       try {
-        const { stdout, stderr } = await execAsync(
+        const { stdout } = await execAsync(
           `adb -s ${deviceId} shell "${method}"`
         );
 
-        if (
-          stdout.trim() === "EXISTS" ||
-          stdout.trim() === executorPath ||
-          stdout.trim().endsWith(executorPath)
-        ) {
-          Logger.success(`Found ${executorPath} using method: ${method}`);
+        if (stdout.trim() === "EXISTS") {
+          Logger.success(`Found ${executorPath}`);
           return true;
         }
       } catch (error) {
@@ -96,14 +88,13 @@ async function checkExecutorExists(
       const folderName = path.posix.basename(executorPath);
 
       const { stdout } = await execAsync(
-        `adb -s ${deviceId} shell "ls ${escapeShellArg(parentPath)} 2>/dev/null"`
+        `adb -s ${deviceId} shell "ls '${parentPath}' 2>/dev/null"`
       );
 
       const folders = stdout
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line);
-      Logger.muted(`Found folders in ${parentPath}: ${folders.join(", ")}`);
 
       const exists = folders.some((folder) => folder === folderName);
       if (exists) {
@@ -200,9 +191,9 @@ async function listDirectoryContents(
     Logger.muted(`Checking: ${directoryPath}`);
 
     const commands = [
-      `ls -1 ${escapeShellArg(directoryPath)} 2>/dev/null`,
-      `ls ${escapeShellArg(directoryPath)} 2>/dev/null`,
-      `find ${escapeShellArg(directoryPath)} -maxdepth 1 -type f -o -type d 2>/dev/null | grep -v '^${directoryPath}$'`,
+      `ls -la "${directoryPath}"`,
+      `ls "${directoryPath}"`,
+      `ls -1 "${directoryPath}"`,
     ];
 
     for (const command of commands) {
@@ -211,20 +202,21 @@ async function listDirectoryContents(
           `adb -s ${deviceId} shell "${command}"`
         );
 
-        if (stdout.trim() && !stderr.includes("Permission denied")) {
+        if (
+          stdout.trim() &&
+          !stderr.includes("Permission denied") &&
+          !stderr.includes("No such file")
+        ) {
           return parseDirectoryOutput(stdout, directoryPath, deviceId);
         }
       } catch (error) {
-        Logger.warning(`Command failed: ${command}`);
         continue;
       }
     }
 
     Logger.warning(`Attempting to create directory: ${directoryPath}`);
     try {
-      await execAsync(
-        `adb -s ${deviceId} shell "mkdir -p ${escapeShellArg(directoryPath)}"`
-      );
+      await createDirectoryOnDevice(deviceId, directoryPath);
       Logger.success(`Directory created successfully`);
       return [];
     } catch (createError) {
@@ -243,52 +235,64 @@ async function parseDirectoryOutput(
   directoryPath: string,
   deviceId: string
 ): Promise<FileSystemItem[]> {
-  const lines = output.split("\n").filter((line) => line.trim());
+  const normalizedOutput = output.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalizedOutput.split("\n").filter((line) => line.trim());
   const items: FileSystemItem[] = [];
 
+  const isDetailedListing = lines.some(
+    (line) => line.startsWith("total ") || line.match(/^[drwx-]{10}/)
+  );
+
   for (const line of lines) {
-    const name = line.trim();
-    if (!name || name === "." || name === "..") continue;
+    const trimmedLine = line.trim();
 
-    const itemPath = path.posix.join(directoryPath, name);
-    let isDirectory = false;
+    if (
+      !trimmedLine ||
+      trimmedLine === "." ||
+      trimmedLine === ".." ||
+      trimmedLine.startsWith("total ")
+    ) {
+      continue;
+    }
 
-    try {
-      const { stdout: lsOutput } = await execAsync(
-        `adb -s ${deviceId} shell "ls -d ${escapeShellArg(itemPath)}/ 2>/dev/null"`
-      );
-      if (lsOutput.trim() && lsOutput.includes("/")) {
-        isDirectory = true;
+    let name: string;
+    let isDirectory: boolean;
+
+    if (isDetailedListing) {
+      const parts = trimmedLine.split(/\s+/);
+
+      if (parts.length < 8) {
+        continue;
       }
-    } catch {}
 
-    if (!isDirectory) {
+      const permissions = parts[0];
+      if (!permissions) {
+        continue;
+      }
+
+      name = parts.slice(7).join(" ");
+      isDirectory = permissions.startsWith("d");
+    } else {
+      name = trimmedLine;
+      const itemPath = path.posix.join(directoryPath, name);
+
       try {
-        const { stdout: cdOutput } = await execAsync(
-          `adb -s ${deviceId} shell "cd ${escapeShellArg(itemPath)} 2>/dev/null && echo 'DIR'" 2>/dev/null`
+        const { stdout: testOutput } = await execAsync(
+          `adb -s ${deviceId} shell "test -d '${itemPath}' && echo 'DIR' || echo 'FILE'"`
         );
-        if (cdOutput.trim() === "DIR") {
-          isDirectory = true;
-        }
-      } catch {}
+        isDirectory = testOutput.trim() === "DIR";
+      } catch {
+        isDirectory = false;
+      }
     }
 
-    if (!isDirectory) {
-      try {
-        const { stdout: fileOutput } = await execAsync(
-          `adb -s ${deviceId} shell "file ${escapeShellArg(itemPath)} 2>/dev/null"`
-        );
-        if (fileOutput.includes("directory")) {
-          isDirectory = true;
-        }
-      } catch {}
+    if (name && name !== "." && name !== "..") {
+      items.push({
+        name,
+        path: path.posix.join(directoryPath, name),
+        isDirectory,
+      });
     }
-
-    items.push({
-      name,
-      path: itemPath,
-      isDirectory,
-    });
   }
 
   return items.sort((a, b) => {
@@ -331,7 +335,7 @@ async function viewFileContent(
 
   try {
     const { stdout } = await execAsync(
-      `adb -s ${deviceId} shell cat ${escapeShellArg(filePath)}`
+      `adb -s ${deviceId} shell "cat '${filePath}'"`
     );
 
     if (stdout.trim()) {
@@ -417,13 +421,9 @@ async function deleteFileOrDirectory(
 
     try {
       if (isDirectory) {
-        await execAsync(
-          `adb -s ${device.id} shell "rm -rf ${escapeShellArg(itemPath)}"`
-        );
+        await execAsync(`adb -s ${device.id} shell "rm -rf '${itemPath}'"`);
       } else {
-        await execAsync(
-          `adb -s ${device.id} shell "rm ${escapeShellArg(itemPath)}"`
-        );
+        await execAsync(`adb -s ${device.id} shell "rm '${itemPath}'"`);
       }
 
       deviceSpinner.stop(colors.green(`${device.id}`));
@@ -437,6 +437,72 @@ async function deleteFileOrDirectory(
   Logger.operationResult(success, failed, "deletion");
 
   return success > 0;
+}
+
+async function verifyDirectoryExists(
+  deviceId: string,
+  dirPath: string
+): Promise<boolean> {
+  const methods = [
+    `test -d "${dirPath}" && echo 'EXISTS'`,
+    `ls -d "${dirPath}" 2>/dev/null && echo 'EXISTS'`,
+    `cd "${dirPath}" 2>/dev/null && echo 'EXISTS'`,
+  ];
+
+  for (const method of methods) {
+    try {
+      const { stdout } = await execAsync(
+        `adb -s ${deviceId} shell "${method}"`
+      );
+      if (stdout.trim() === "EXISTS") {
+        return true;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  return false;
+}
+
+async function createDirectoryOnDevice(
+  deviceId: string,
+  dirPath: string
+): Promise<void> {
+  const alreadyExists = await verifyDirectoryExists(deviceId, dirPath);
+  if (alreadyExists) {
+    return;
+  }
+
+  const commands = [`mkdir -p "${dirPath}"`, `mkdir -p '${dirPath}'`];
+
+  for (const command of commands) {
+    try {
+      await execAsync(`adb -s ${deviceId} shell "${command}"`);
+      const verified = await verifyDirectoryExists(deviceId, dirPath);
+      if (verified) {
+        return;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  const pathParts = dirPath.split("/").filter((part) => part);
+  let currentPath = "";
+
+  for (const part of pathParts) {
+    currentPath += "/" + part;
+
+    const partExists = await verifyDirectoryExists(deviceId, currentPath);
+    if (partExists) {
+      continue;
+    }
+
+    try {
+      await execAsync(`adb -s ${deviceId} shell "mkdir '${currentPath}'"`);
+    } catch (error) {}
+  }
 }
 
 async function copyFromLocalToCurrentPath(
@@ -499,7 +565,94 @@ async function copyFromLocalToCurrentPath(
     return;
   }
 
-  await copyLocalToDevices(cleanPath, targetDevices, targetPath);
+  await copyLocalToDevicesFixed(cleanPath, targetDevices, targetPath);
+}
+
+async function copyLocalToDevicesFixed(
+  localPath: string,
+  targetDevices: AdbDevice[],
+  targetPath: string
+): Promise<void> {
+  Logger.success("Copying from local machine...", { spaceBefore: true });
+
+  let success = 0;
+  let failed = 0;
+
+  for (const device of targetDevices) {
+    const deviceSpinner = spinner();
+    deviceSpinner.start(colors.gray(`Copying to ${device.id}...`));
+
+    try {
+      const targetDir = path.posix.dirname(targetPath);
+
+      await createDirectoryOnDevice(device.id, targetDir);
+
+      const pushMethods = [
+        () =>
+          execAsync(`adb -s ${device.id} push "${localPath}" "${targetPath}"`),
+
+        () =>
+          execAsync(`adb -s ${device.id} push "${localPath}" ${targetPath}`),
+
+        async () => {
+          const fileName = path.posix.basename(targetPath);
+          const tempPath = `/data/local/tmp/${fileName}`;
+          await execAsync(
+            `adb -s ${device.id} push "${localPath}" "${tempPath}"`
+          );
+          await execAsync(
+            `adb -s ${device.id} shell "cp '${tempPath}' '${targetPath}' && rm '${tempPath}'"`
+          );
+        },
+      ];
+
+      let pushSuccess = false;
+      for (const pushMethod of pushMethods) {
+        try {
+          await pushMethod();
+          pushSuccess = true;
+          break;
+        } catch (error) {
+          const errorStr = String(error);
+          if (
+            errorStr.includes("file pushed") ||
+            errorStr.includes("1 file pushed")
+          ) {
+            pushSuccess = true;
+            break;
+          }
+          continue;
+        }
+      }
+
+      if (!pushSuccess) {
+        throw new Error("All push methods failed");
+      }
+
+      try {
+        const { stdout } = await execAsync(
+          `adb -s ${device.id} shell "ls -la '${targetPath}'"`
+        );
+        if (stdout.trim()) {
+          deviceSpinner.stop(colors.green(`${device.id} ✓`));
+          success++;
+        } else {
+          throw new Error("File not found after push");
+        }
+      } catch (verifyError) {
+        deviceSpinner.stop(
+          colors.yellow(`${device.id} (pushed, verification unclear)`)
+        );
+        success++;
+      }
+    } catch (error) {
+      deviceSpinner.stop(colors.red(`${device.id} ✗`));
+      Logger.error(`Error: ${error}`, { indent: 1 });
+      failed++;
+    }
+  }
+
+  Logger.operationResult(success, failed, "copy operation");
 }
 
 async function browseAndManageFiles(
@@ -758,14 +911,14 @@ async function copyDirectoryContents(
       )}`;
       try {
         await execAsync(
-          `adb -s ${sourceDeviceId} pull ${escapeShellArg(sourceItemPath)} "${localTemp}"`
+          `adb -s ${sourceDeviceId} pull "${sourceItemPath}" "${localTemp}"`
         );
 
         const parentDir = path.posix.dirname(targetItemPath);
         await createDirectoryOnDevice(targetDeviceId, parentDir);
 
         await execAsync(
-          `adb -s ${targetDeviceId} push "${localTemp}" ${escapeShellArg(targetItemPath)}`
+          `adb -s ${targetDeviceId} push "${localTemp}" "${targetItemPath}"`
         );
         await execAsync(
           `rm -f "${localTemp}" 2>/dev/null || del /Q "${localTemp}" 2>nul`
@@ -774,39 +927,6 @@ async function copyDirectoryContents(
         Logger.warning(`Failed to copy ${item.name}: ${error}`);
       }
     }
-  }
-}
-
-async function createDirectoryOnDevice(
-  deviceId: string,
-  dirPath: string
-): Promise<void> {
-  const commands = [
-    `mkdir -p ${escapeShellArg(dirPath)}`,
-    `mkdir ${escapeShellArg(dirPath)}`,
-    `busybox mkdir -p ${escapeShellArg(dirPath)}`,
-    `test -d ${escapeShellArg(dirPath)} || mkdir ${escapeShellArg(dirPath)}`,
-  ];
-
-  for (const command of commands) {
-    try {
-      await execAsync(`adb -s ${deviceId} shell "${command}" 2>/dev/null`);
-      return;
-    } catch (error) {
-      continue;
-    }
-  }
-
-  const pathParts = dirPath.split("/").filter((part) => part);
-  let currentPath = "";
-
-  for (const part of pathParts) {
-    currentPath += "/" + part;
-    try {
-      await execAsync(
-        `adb -s ${deviceId} shell "test -d ${escapeShellArg(currentPath)} || mkdir ${escapeShellArg(currentPath)}" 2>/dev/null`
-      );
-    } catch (error) {}
   }
 }
 
@@ -838,14 +958,14 @@ async function copyDirectoryRecursive(
       )}`;
       try {
         await execAsync(
-          `adb -s ${sourceDeviceId} pull ${escapeShellArg(sourceItemPath)} "${localTemp}"`
+          `adb -s ${sourceDeviceId} pull "${sourceItemPath}" "${localTemp}"`
         );
 
         const parentDir = path.posix.dirname(targetItemPath);
         await createDirectoryOnDevice(targetDeviceId, parentDir);
 
         await execAsync(
-          `adb -s ${targetDeviceId} push "${localTemp}" ${escapeShellArg(targetItemPath)}`
+          `adb -s ${targetDeviceId} push "${localTemp}" "${targetItemPath}"`
         );
         await execAsync(
           `rm -f "${localTemp}" 2>/dev/null || del /Q "${localTemp}" 2>nul`
@@ -901,50 +1021,17 @@ async function copyToDevices(
           .basename(sourcePath)
           .replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         await execAsync(
-          `adb -s ${sourceDeviceId} pull ${escapeShellArg(sourcePath)} "${localTemp}"`
+          `adb -s ${sourceDeviceId} pull "${sourcePath}" "${localTemp}"`
         );
 
         await execAsync(
-          `adb -s ${device.id} push "${localTemp}" ${escapeShellArg(sourcePath)}`
+          `adb -s ${device.id} push "${localTemp}" "${sourcePath}"`
         );
 
         await execAsync(
           `rm -f "${localTemp}" 2>/dev/null || del /Q "${localTemp}" 2>nul`
         );
       }
-
-      deviceSpinner.stop(colors.green(`${device.id}`));
-      success++;
-    } catch (error) {
-      deviceSpinner.stop(colors.red(`${device.id}`));
-      Logger.error(`Error: ${error}`, { indent: 1 });
-      failed++;
-    }
-  }
-
-  Logger.operationResult(success, failed, "copy operation");
-}
-
-async function copyLocalToDevices(
-  localPath: string,
-  targetDevices: AdbDevice[],
-  targetPath: string
-): Promise<void> {
-  Logger.success("Copying from local machine...", { spaceBefore: true });
-
-  let success = 0;
-  let failed = 0;
-
-  for (const device of targetDevices) {
-    const deviceSpinner = spinner();
-    deviceSpinner.start(colors.gray(`Copying to ${device.id}...`));
-
-    try {
-      const targetDir = path.posix.dirname(targetPath);
-      await createDirectoryOnDevice(device.id, targetDir);
-      await execAsync(
-        `adb -s ${device.id} push "${localPath}" ${escapeShellArg(targetPath)}`
-      );
 
       deviceSpinner.stop(colors.green(`${device.id}`));
       success++;

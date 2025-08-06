@@ -34,47 +34,38 @@ export class Logger {
     if (spaceAfter) console.log();
   }
 
-  // Success messages (green)
   static success(message: string, options?: LogOptions): void {
     this.log(message, colors.green, options);
   }
 
-  // Error messages (red)
   static error(message: string, options?: LogOptions): void {
     this.log(message, colors.red, options);
   }
 
-  // Warning messages (yellow)
   static warning(message: string, options?: LogOptions): void {
     this.log(message, colors.yellow, options);
   }
 
-  // Info messages (cyan)
   static info(message: string, options?: LogOptions): void {
     this.log(message, colors.cyan, options);
   }
 
-  // Gray/muted messages
   static muted(message: string, options?: LogOptions): void {
     this.log(message, colors.gray, options);
   }
 
-  // White/normal messages
   static normal(message: string, options?: LogOptions): void {
     this.log(message, colors.white, options);
   }
 
-  // Bold messages
   static bold(message: string, options?: LogOptions): void {
     this.log(message, colors.bold, options);
   }
 
-  // Blue messages
   static blue(message: string, options?: LogOptions): void {
     this.log(message, colors.blue, options);
   }
 
-  // Combination methods for common patterns
   static title(
     message: string,
     options?: Omit<LogOptions, "spaceBefore" | "spaceAfter">
@@ -166,7 +157,6 @@ export class Logger {
     }
   }
 
-  // Utility methods
   static space(): void {
     console.log();
   }
