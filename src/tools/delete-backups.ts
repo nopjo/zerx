@@ -2,6 +2,7 @@ import { spinner, outro, confirm, select } from "@clack/prompts";
 import colors from "picocolors";
 import path from "path";
 import { existsSync, readdirSync, statSync, unlinkSync } from "fs";
+import { Logger } from "@/utils/logger";
 
 interface BackupFile {
   name: string;
@@ -81,10 +82,8 @@ async function deleteBackupFile(filePath: string): Promise<void> {
 }
 
 export async function deleteLDPlayerBackups(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[X] " + colors.bold("Delete LDPlayer Backups")));
-  console.log(colors.gray("   Clean up backup files to free disk space"));
-  console.log();
+  Logger.title("[X] Delete LDPlayer Backups");
+  Logger.muted("Clean up backup files to free disk space", { indent: 1 });
 
   const loadingSpinner = spinner();
   loadingSpinner.start(colors.gray("Scanning for backup files..."));
@@ -111,31 +110,25 @@ export async function deleteLDPlayerBackups(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.cyan("[#] Found Backup Files:"));
-  console.log(
-    colors.gray(
-      `   Total: ${backupFiles.length} files (${calculateTotalSize(
-        backupFiles
-      )})`
-    )
+  Logger.info("[#] Found Backup Files:", { spaceBefore: true });
+  Logger.muted(
+    `Total: ${backupFiles.length} files (${calculateTotalSize(backupFiles)})`,
+    { indent: 1 }
   );
-  console.log();
 
   for (let i = 0; i < backupFiles.length; i++) {
     const backup = backupFiles[i];
     if (backup) {
-      console.log(
-        `   ${colors.cyan((i + 1).toString())}. ${colors.white(backup.name)}`
+      Logger.normal(
+        `${colors.cyan((i + 1).toString())}. ${colors.white(backup.name)}`,
+        { indent: 1, spaceBefore: true }
       );
-      console.log(
-        `      ${colors.gray(
-          `Size: ${backup.size} | Created: ${backup.created}`
-        )}`
-      );
+      Logger.muted(`Size: ${backup.size} | Created: ${backup.created}`, {
+        indent: 2,
+      });
     }
   }
-  console.log();
+  Logger.space();
 
   const deleteOptions = [
     {
@@ -220,8 +213,7 @@ export async function deleteLDPlayerBackups(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.red("[X] Starting deletion..."));
+  Logger.error("[X] Starting deletion...", { spaceBefore: true });
 
   let deletedCount = 0;
   let failedCount = 0;
@@ -236,31 +228,26 @@ export async function deleteLDPlayerBackups(): Promise<void> {
       deletedCount++;
     } catch (error) {
       deleteSpinner.stop(colors.red(`[X] Failed to delete: ${backup.name}`));
-      console.log(
-        colors.red(
-          `   Error: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        )
+      Logger.error(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        { indent: 1 }
       );
       failedCount++;
     }
   }
 
-  console.log();
   if (deletedCount > 0) {
-    console.log(
-      colors.green(`Successfully deleted ${deletedCount} backup file(s)!`)
-    );
-    console.log(
-      colors.gray(
-        `   Freed up ${formatFileSize(totalSizeToDelete)} of disk space`
-      )
+    Logger.success(`Successfully deleted ${deletedCount} backup file(s)!`, {
+      spaceBefore: true,
+    });
+    Logger.muted(
+      `Freed up ${formatFileSize(totalSizeToDelete)} of disk space`,
+      { indent: 1 }
     );
   }
 
   if (failedCount > 0) {
-    console.log(colors.red(`[!] Failed to delete ${failedCount} file(s)`));
+    Logger.error(`[!] Failed to delete ${failedCount} file(s)`);
   }
 
   outro(colors.cyan("[*] Cleanup completed"));

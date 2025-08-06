@@ -5,6 +5,7 @@ import path from "path";
 import { promisify } from "util";
 import { exec } from "child_process";
 import { updateConfig, getConfigValue } from "./config";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -39,21 +40,17 @@ export async function getLDPlayerPath(): Promise<string | null> {
 
   updateConfig("ldPlayerPath", fullConsolePath);
 
-  console.log(colors.green("[+] LDPlayer path saved to config.json"));
+  Logger.success("[+] LDPlayer path saved to config.json");
 
   return fullConsolePath;
 }
 
 export function printInstancesList(instances: LDPlayerInstance[]): void {
-  console.log();
-  console.log(
-    colors.cyan("[-] " + colors.bold("Available LDPlayer Instances:"))
-  );
-  console.log();
+  Logger.title("[-] Available LDPlayer Instances:");
 
   if (instances.length === 0) {
-    console.log(colors.yellow("[!] No instances found"));
-    console.log(colors.gray("   Create some LDPlayer instances first."));
+    Logger.warning("[!] No instances found");
+    Logger.muted("Create some LDPlayer instances first.", { indent: 1 });
     return;
   }
 
@@ -61,19 +58,15 @@ export function printInstancesList(instances: LDPlayerInstance[]): void {
     const statusColor =
       instance.status === "Running" ? colors.green : colors.gray;
 
-    console.log(
-      colors.gray(`   ${instance.index}. `) +
-        colors.white(instance.name) +
-        " - " +
-        statusColor(colors.bold(instance.status))
+    Logger.muted(
+      `${instance.index}. ${colors.white(instance.name)} - ${statusColor(colors.bold(instance.status))}`,
+      { indent: 1 }
     );
   });
 
-  console.log();
-  console.log(
-    colors.gray(
-      `   Total: ${colors.white(instances.length.toString())} instance(s)`
-    )
+  Logger.muted(
+    `Total: ${colors.white(instances.length.toString())} instance(s)`,
+    { indent: 1, spaceBefore: true }
   );
 }
 
@@ -146,10 +139,9 @@ export async function getLDPlayerInstances(
 
     return instances;
   } catch (error) {
-    console.log(
-      colors.yellow(
-        "   [!] Could not parse instance list, trying alternative method..."
-      )
+    Logger.warning(
+      "[!] Could not parse instance list, trying alternative method...",
+      { indent: 1 }
     );
     return [];
   }
@@ -220,11 +212,11 @@ export async function launchInstance(
 
 export async function rebootAllLDPlayerInstances(): Promise<void> {
   try {
-    console.log(colors.yellow("[~] Starting LDPlayer reboot process..."));
+    Logger.warning("[~] Starting LDPlayer reboot process...");
 
     const ldPath = await getLDPlayerPath();
     if (!ldPath) {
-      console.log(colors.red("[X] LDPlayer path not configured"));
+      Logger.error("[X] LDPlayer path not configured");
       return;
     }
 
@@ -232,35 +224,33 @@ export async function rebootAllLDPlayerInstances(): Promise<void> {
     const runningInstances = instances.filter((i) => i.status === "Running");
 
     if (runningInstances.length === 0) {
-      console.log(colors.gray("[-] No running instances to reboot"));
+      Logger.muted("[-] No running instances to reboot");
       return;
     }
 
-    console.log(
-      colors.cyan(
-        `[~] Rebooting ${runningInstances.length} running instances...`
-      )
+    Logger.info(
+      `[~] Rebooting ${runningInstances.length} running instances...`
     );
 
     for (const instance of runningInstances) {
-      console.log(colors.gray(`   [!] Stopping ${instance.name}...`));
+      Logger.muted(`[!] Stopping ${instance.name}...`, { indent: 1 });
       await execAsync(`"${ldPath}" quit --index ${instance.index}`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    console.log(colors.gray("[~] Waiting for instances to stop..."));
+    Logger.muted("[~] Waiting for instances to stop...");
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     for (const instance of runningInstances) {
-      console.log(colors.gray(`   [^] Starting ${instance.name}...`));
+      Logger.muted(`[^] Starting ${instance.name}...`, { indent: 1 });
       await execAsync(`"${ldPath}" launch --index ${instance.index}`);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
-    console.log(colors.green("[+] LDPlayer reboot complete!"));
-    console.log(colors.gray("[~] Waiting for instances to fully start..."));
+    Logger.success("[+] LDPlayer reboot complete!");
+    Logger.muted("[~] Waiting for instances to fully start...");
     await new Promise((resolve) => setTimeout(resolve, 10000));
   } catch (error) {
-    console.log(colors.red(`[X] Reboot failed: ${error}`));
+    Logger.error(`[X] Reboot failed: ${error}`);
   }
 }

@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { getConnectedDevices, printConnectedDevices } from "@/utils/adb";
 import { validateRobloxCookie } from "@/utils/roblox";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -70,10 +71,9 @@ async function detectRobloxInstances(
 
     return instances;
   } catch (error) {
-    console.log(
-      colors.gray(
-        `    [!] Could not detect Roblox instances on ${deviceId}: ${error}`
-      )
+    Logger.muted(
+      `[!] Could not detect Roblox instances on ${deviceId}: ${error}`,
+      { indent: 1 }
     );
 
     const isRunning = await isAppRunning(deviceId, "com.roblox.client");
@@ -124,14 +124,13 @@ async function getAllRobloxInstancesWithUsers(
     const instances = await detectRobloxInstances(device.id);
 
     for (const instance of instances) {
-      console.log(
-        colors.gray(
-          `   [@] Checking ${instance.packageName} on ${device.id}... ${
-            instance.isRunning
-              ? colors.green("(RUNNING)")
-              : colors.gray("(NOT RUNNING)")
-          }`
-        )
+      Logger.muted(
+        `[@] Checking ${instance.packageName} on ${device.id}... ${
+          instance.isRunning
+            ? colors.green("(RUNNING)")
+            : colors.gray("(NOT RUNNING)")
+        }`,
+        { indent: 1 }
       );
 
       const username = await getUsernameFromInstance(
@@ -157,9 +156,7 @@ async function getAllRobloxInstancesWithUsers(
 }
 
 function printInstancesWithUsers(instances: InstanceWithUser[]): void {
-  console.log();
-  console.log(colors.cyan("[-] " + colors.bold("Roblox Instances:")));
-  console.log();
+  Logger.title("[-] Roblox Instances:");
 
   const deviceGroups = new Map<string, InstanceWithUser[]>();
   instances.forEach((instance) => {
@@ -174,10 +171,9 @@ function printInstancesWithUsers(instances: InstanceWithUser[]): void {
 
   for (const [deviceName, deviceInstances] of deviceGroups) {
     const runningCount = deviceInstances.filter((i) => i.isRunning).length;
-    console.log(
-      colors.green(
-        `   [-] ${deviceName}: ${deviceInstances.length} instance(s) - ${runningCount} running`
-      )
+    Logger.success(
+      `[-] ${deviceName}: ${deviceInstances.length} instance(s) - ${runningCount} running`,
+      { indent: 1 }
     );
 
     deviceInstances.forEach((instance) => {
@@ -191,18 +187,14 @@ function printInstancesWithUsers(instances: InstanceWithUser[]): void {
         ? colors.blue(`@${instance.username}`)
         : colors.gray(instance.isRunning ? "Running (no user)" : "Not running");
 
-      console.log(
-        colors.gray(`      └── ${statusIcon} ${appName} - ${userInfo}`)
-      );
+      Logger.muted(`└── ${statusIcon} ${appName} - ${userInfo}`, { indent: 2 });
     });
   }
 
   const totalRunning = instances.filter((i) => i.isRunning).length;
-  console.log();
-  console.log(
-    colors.cyan(
-      `Total instances: ${instances.length} (${totalRunning} running)`
-    )
+  Logger.info(
+    `Total instances: ${instances.length} (${totalRunning} running)`,
+    { spaceBefore: true }
   );
 }
 
@@ -236,12 +228,10 @@ async function closeRobloxInstance(
 }
 
 export async function closeAllRobloxProcesses(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[!] " + colors.bold("Close Roblox Processes")));
-  console.log(
-    colors.gray("   Force stop Roblox applications on connected devices")
-  );
-  console.log();
+  Logger.title("[!] Close Roblox Processes");
+  Logger.muted("Force stop Roblox applications on connected devices", {
+    indent: 1,
+  });
 
   const deviceSpinner = spinner();
   deviceSpinner.start(colors.gray("Scanning for connected devices..."));
@@ -361,9 +351,10 @@ export async function closeAllRobloxProcesses(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting Roblox termination process..."));
-  console.log();
+  Logger.success("[^] Starting Roblox termination process...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const closeSpinner = spinner();
   closeSpinner.start(colors.gray("Closing selected Roblox instances..."));
@@ -380,9 +371,7 @@ export async function closeAllRobloxProcesses(): Promise<void> {
   const results = await Promise.all(closeTasks);
   closeSpinner.stop();
 
-  console.log();
-  console.log(colors.cyan("[!] " + colors.bold("Close Results:")));
-  console.log();
+  Logger.title("[!] Close Results:");
 
   const successfulCloses = results.filter((result) => result.isSuccess);
 
@@ -398,7 +387,7 @@ export async function closeAllRobloxProcesses(): Promise<void> {
   });
 
   for (const [deviceName, deviceResults] of resultsByDevice) {
-    console.log(colors.cyan(`[-] ${deviceName}:`));
+    Logger.info(`[-] ${deviceName}:`);
 
     deviceResults.forEach((result) => {
       const appName =
@@ -408,22 +397,18 @@ export async function closeAllRobloxProcesses(): Promise<void> {
       const userInfo = result.username ? ` (@${result.username})` : "";
 
       if (result.isSuccess) {
-        console.log(
-          colors.green(
-            `   [+] ${appName}${userInfo} - Process closed successfully`
-          )
+        Logger.success(
+          `[+] ${appName}${userInfo} - Process closed successfully`,
+          { indent: 1 }
         );
       } else {
-        console.log(
-          colors.red(
-            `   [X] ${appName}${userInfo} - ${
-              result.error || "Failed to close"
-            }`
-          )
+        Logger.error(
+          `[X] ${appName}${userInfo} - ${result.error || "Failed to close"}`,
+          { indent: 1 }
         );
       }
     });
-    console.log();
+    Logger.space();
   }
 
   if (successfulCloses.length === instancesToClose.length) {

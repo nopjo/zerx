@@ -1,13 +1,14 @@
 import { outro } from "@clack/prompts";
 import colors from "picocolors";
 import { runTool } from "./tools";
+import { Logger } from "@/utils/logger";
 
 async function main() {
   try {
     await runTool();
   } catch (error) {
-    console.log();
-    console.error(colors.red("[X]" + colors.bold("Error occurred:")), error);
+    Logger.error("Error occurred:", { spaceBefore: true });
+    console.error(error);
     outro(colors.red("CLI Tool crashed - check the error above"));
     process.exit(1);
   }

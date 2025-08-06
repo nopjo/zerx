@@ -9,16 +9,13 @@ import {
   stopInstance,
   type LDPlayerInstance,
 } from "@/utils/ld";
+import { Logger } from "@/utils/logger";
 
 export async function closeAllEmulators(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[!] " + colors.bold("Close All Emulators")));
-  console.log(colors.gray("   Shut down all running LDPlayer instances"));
-  console.log();
+  Logger.title("[!] Close All Emulators");
+  Logger.muted("Shut down all running LDPlayer instances", { indent: 1 });
 
-  console.log(
-    colors.gray("[>] Please specify your LDPlayer installation path...")
-  );
+  Logger.muted("[>] Please specify your LDPlayer installation path...");
   const ldPath = await getLDPlayerPath();
 
   if (!ldPath) {
@@ -26,7 +23,7 @@ export async function closeAllEmulators(): Promise<void> {
     return;
   }
 
-  console.log(colors.green(`[+] Using LDPlayer at: ${ldPath}`));
+  Logger.success(`[+] Using LDPlayer at: ${ldPath}`);
 
   const loadingSpinner = spinner();
   loadingSpinner.start(colors.gray("Loading LDPlayer instances..."));
@@ -65,8 +62,7 @@ export async function closeAllEmulators(): Promise<void> {
   );
 
   if (runningInstances.length === 0) {
-    console.log();
-    console.log(colors.green("All instances are already stopped!"));
+    Logger.success("All instances are already stopped!", { spaceBefore: true });
     outro(
       colors.cyan(
         `[*] ${stoppedInstances.length}/${instances.length} instances stopped`
@@ -75,20 +71,16 @@ export async function closeAllEmulators(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(
-    colors.yellow(
-      `[!] Found ${colors.bold(
-        runningInstances.length.toString()
-      )} running instance(s)`
-    )
+  Logger.warning(
+    `[!] Found ${colors.bold(
+      runningInstances.length.toString()
+    )} running instance(s)`,
+    { spaceBefore: true }
   );
-  console.log(
-    colors.green(
-      `[+] Found ${colors.bold(
-        stoppedInstances.length.toString()
-      )} stopped instance(s)`
-    )
+  Logger.success(
+    `[+] Found ${colors.bold(
+      stoppedInstances.length.toString()
+    )} stopped instance(s)`
   );
 
   const shouldProceed = await confirm({
@@ -102,9 +94,10 @@ export async function closeAllEmulators(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.yellow("[!] Starting shutdown operation..."));
-  console.log();
+  Logger.warning("[!] Starting shutdown operation...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const shutdownSpinner = spinner();
 
@@ -119,7 +112,7 @@ export async function closeAllEmulators(): Promise<void> {
 
     shutdownSpinner.stop(colors.green("[+] Shutdown command sent"));
 
-    console.log(colors.gray("[@] Verifying shutdown status..."));
+    Logger.muted("[@] Verifying shutdown status...");
 
     const verificationPromises = runningInstances.map(async (instance) => {
       try {
@@ -147,29 +140,25 @@ export async function closeAllEmulators(): Promise<void> {
       (result) => !result.isStillRunning
     );
 
-    console.log();
-    console.log(colors.cyan("[!] " + colors.bold("Shutdown Results:")));
-    console.log();
+    Logger.title("[!] Shutdown Results:");
 
     if (successfullyStopped.length > 0) {
-      console.log(colors.green("[+] Successfully stopped:"));
+      Logger.success("[+] Successfully stopped:");
       for (const result of successfullyStopped) {
-        console.log(colors.green(`   • ${result.instance.name}`));
+        Logger.success(`• ${result.instance.name}`, { indent: 1 });
       }
     }
 
     if (stillRunning.length > 0) {
-      console.log();
-      console.log(
-        colors.yellow("[!] Still running (attempting individual shutdown):")
-      );
+      Logger.warning("[!] Still running (attempting individual shutdown):", {
+        spaceBefore: true,
+      });
 
       const individualShutdownPromises = stillRunning.map(async (result) => {
         try {
-          console.log(
-            colors.gray(
-              `   [!] Stopping: ${colors.white(result.instance.name)}...`
-            )
+          Logger.muted(
+            `[!] Stopping: ${colors.white(result.instance.name)}...`,
+            { indent: 1 }
           );
 
           await stopInstance(ldPath, result.instance.index);
@@ -181,29 +170,24 @@ export async function closeAllEmulators(): Promise<void> {
           );
 
           if (!isStillRunning) {
-            console.log(
-              colors.green(
-                `   [+] ${colors.white(
-                  result.instance.name
-                )} stopped successfully`
-              )
+            Logger.success(
+              `[+] ${colors.white(result.instance.name)} stopped successfully`,
+              { indent: 1 }
             );
             return { instance: result.instance, success: true };
           } else {
-            console.log(
-              colors.red(
-                `   [X] ${colors.white(result.instance.name)} failed to stop`
-              )
+            Logger.error(
+              `[X] ${colors.white(result.instance.name)} failed to stop`,
+              { indent: 1 }
             );
             return { instance: result.instance, success: false };
           }
         } catch (error) {
           const errorMsg =
             error instanceof Error ? error.message : "Unknown error";
-          console.log(
-            colors.red(
-              `   [X] ${colors.white(result.instance.name)} failed: ${errorMsg}`
-            )
+          Logger.error(
+            `[X] ${colors.white(result.instance.name)} failed: ${errorMsg}`,
+            { indent: 1 }
           );
           return { instance: result.instance, success: false, error: errorMsg };
         }
@@ -215,21 +199,19 @@ export async function closeAllEmulators(): Promise<void> {
       );
 
       if (finalFailures.length > 0) {
-        console.log();
-        console.log(colors.red("[X] Failed to stop:"));
+        Logger.error("[X] Failed to stop:", { spaceBefore: true });
         for (const result of finalFailures) {
-          console.log(
-            colors.red(
-              `   • ${result.instance.name}${
-                result.error ? `: ${result.error}` : ""
-              }`
-            )
+          Logger.error(
+            `• ${result.instance.name}${
+              result.error ? `: ${result.error}` : ""
+            }`,
+            { indent: 1 }
           );
         }
       }
     }
 
-    console.log();
+    Logger.space();
 
     const totalSuccessful =
       successfullyStopped.length +
@@ -284,12 +266,10 @@ export async function closeAllEmulators(): Promise<void> {
     }
   } catch (error) {
     shutdownSpinner.stop(colors.red("[X] Shutdown failed"));
-    console.log();
-    console.log(colors.red("[X] Shutdown operation failed"));
-    console.log(
-      colors.red(
-        `   Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
+    Logger.error("Shutdown operation failed", { spaceBefore: true });
+    Logger.error(
+      `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { indent: 1 }
     );
     outro(colors.red("[X] Please try closing instances manually"));
   }

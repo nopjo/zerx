@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { getConnectedDevices, printConnectedDevices } from "@/utils/adb";
 import { validateRobloxCookie, type RobloxUserInfo } from "@/utils/roblox";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -44,9 +45,9 @@ async function detectRobloxClones(deviceId: string): Promise<RobloxClone[]> {
 
     return clones;
   } catch (error) {
-    console.log(
-      colors.gray(`    [!] Could not detect clones on ${deviceId}: ${error}`)
-    );
+    Logger.muted(`[!] Could not detect clones on ${deviceId}: ${error}`, {
+      indent: 1,
+    });
     return [];
   }
 }
@@ -73,11 +74,7 @@ function printCloneDetectionResults(
   deviceCloneMap: Map<string, RobloxClone[]>,
   devices: any[]
 ): void {
-  console.log();
-  console.log(
-    colors.cyan("[-] " + colors.bold("Roblox Clone Detection Results:"))
-  );
-  console.log();
+  Logger.title("[-] Roblox Clone Detection Results:");
 
   let totalClones = 0;
 
@@ -88,27 +85,24 @@ function printCloneDetectionResults(
       : device.id;
 
     if (clones.length > 0) {
-      console.log(
-        colors.green(
-          `   [-] ${deviceName}: ${clones.length} Roblox app(s) found`
-        )
+      Logger.success(
+        `[-] ${deviceName}: ${clones.length} Roblox app(s) found`,
+        { indent: 1 }
       );
       clones.forEach((clone) => {
-        console.log(colors.gray(`      └── ${clone.packageName}`));
+        Logger.muted(`└── ${clone.packageName}`, { indent: 2 });
       });
       totalClones += clones.length;
     } else {
-      console.log(colors.yellow(`   [-] ${deviceName}: No Roblox apps found`));
+      Logger.warning(`[-] ${deviceName}: No Roblox apps found`, { indent: 1 });
     }
   }
 
-  console.log();
-  console.log(
-    colors.cyan(
-      `Total Roblox instances across all devices: ${colors.bold(
-        totalClones.toString()
-      )}`
-    )
+  Logger.info(
+    `Total Roblox instances across all devices: ${colors.bold(
+      totalClones.toString()
+    )}`,
+    { spaceBefore: true }
   );
 }
 
@@ -157,11 +151,9 @@ async function injectCookieToClone(
   cookie: string
 ): Promise<boolean> {
   try {
-    console.log(
-      colors.gray(
-        `    [>] Starting injection for ${packageName} on ${deviceId}`
-      )
-    );
+    Logger.muted(`[>] Starting injection for ${packageName} on ${deviceId}`, {
+      indent: 1,
+    });
 
     const cookiePath = `/data/data/${packageName}/app_webview/Default/Cookies`;
 
@@ -169,22 +161,21 @@ async function injectCookieToClone(
       await execAsync(
         `adb -s ${deviceId} shell "su -c 'test -f ${cookiePath}'"`
       );
-      console.log(
-        colors.gray(`    [+] Cookie database found for ${packageName}`)
-      );
+      Logger.muted(`[+] Cookie database found for ${packageName}`, {
+        indent: 1,
+      });
     } catch (error) {
-      console.log(
-        colors.yellow(
-          `    [!] Cookie database not found for ${packageName}, skipping...`
-        )
+      Logger.warning(
+        `[!] Cookie database not found for ${packageName}, skipping...`,
+        { indent: 1 }
       );
       return false;
     }
 
-    console.log(colors.gray(`    [>] Stopping ${packageName}...`));
+    Logger.muted(`[>] Stopping ${packageName}...`, { indent: 1 });
     await execAsync(`adb -s ${deviceId} shell "am force-stop ${packageName}"`);
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log(colors.gray(`    [+] ${packageName} stopped`));
+    Logger.muted(`[+] ${packageName} stopped`, { indent: 1 });
 
     const buffer = Buffer.from(cookie);
     const base64Cookie = buffer.toString("base64");
@@ -195,10 +186,9 @@ async function injectCookieToClone(
 
     const scriptPath = path.join(process.cwd(), "scripts", "update_cookie.sh");
 
-    console.log(
-      colors.gray(
-        `    [>] Pushing update script to device (${uniqueScriptName})...`
-      )
+    Logger.muted(
+      `[>] Pushing update script to device (${uniqueScriptName})...`,
+      { indent: 1 }
     );
     await execAsync(
       `adb -s ${deviceId} push "${scriptPath}" /data/local/tmp/${uniqueScriptName}`
@@ -207,22 +197,21 @@ async function injectCookieToClone(
       `adb -s ${deviceId} shell "chmod 755 /data/local/tmp/${uniqueScriptName}"`
     );
 
-    console.log(
-      colors.gray(
-        `    [>] Writing base64 cookie to device (${uniqueCookieName})...`
-      )
+    Logger.muted(
+      `[>] Writing base64 cookie to device (${uniqueCookieName})...`,
+      { indent: 1 }
     );
     await execAsync(
       `adb -s ${deviceId} shell "echo '${base64Cookie}' > /data/local/tmp/${uniqueCookieName}"`
     );
 
-    console.log(
-      colors.gray(`    [>] Running cookie update script with unique files...`)
-    );
+    Logger.muted(`[>] Running cookie update script with unique files...`, {
+      indent: 1,
+    });
     const scriptCommand = `adb -s ${deviceId} shell "su -c '/data/local/tmp/${uniqueScriptName} ${cookiePath} /data/local/tmp/${uniqueCookieName}'"`;
 
     const { stdout: scriptResult } = await execAsync(scriptCommand);
-    console.log(colors.gray(`    [#] Script output: ${scriptResult.trim()}`));
+    Logger.muted(`[#] Script output: ${scriptResult.trim()}`, { indent: 1 });
 
     await execAsync(
       `adb -s ${deviceId} shell "rm -f /data/local/tmp/${uniqueScriptName}"`
@@ -231,12 +220,12 @@ async function injectCookieToClone(
       `adb -s ${deviceId} shell "rm -f /data/local/tmp/${uniqueCookieName}"`
     );
 
-    console.log(colors.green(`    [+] Cookie updated for ${packageName}`));
+    Logger.success(`[+] Cookie updated for ${packageName}`, { indent: 1 });
     return true;
   } catch (error) {
-    console.log(
-      colors.red(`    [X] Injection failed for ${packageName}: ${error}`)
-    );
+    Logger.error(`[X] Injection failed for ${packageName}: ${error}`, {
+      indent: 1,
+    });
     return false;
   }
 }
@@ -283,14 +272,12 @@ async function loginToClone(
 }
 
 export async function automaticLogin(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[*] " + colors.bold("Automatic Login - Roblox")));
-  console.log(
-    colors.gray("   Automatically login to Roblox using saved cookies")
-  );
-  console.log();
+  Logger.title("[*] Automatic Login - Roblox");
+  Logger.muted("Automatically login to Roblox using saved cookies", {
+    indent: 1,
+  });
 
-  console.log(colors.gray("[@] Please specify your cookies file path..."));
+  Logger.muted("[@] Please specify your cookies file path...");
   const cookieFilePath = await getCookieFilePath();
 
   if (!cookieFilePath) {
@@ -298,7 +285,7 @@ export async function automaticLogin(): Promise<void> {
     return;
   }
 
-  console.log(colors.green(`[+] Using cookies file: ${cookieFilePath}`));
+  Logger.success(`[+] Using cookies file: ${cookieFilePath}`);
 
   const loadSpinner = spinner();
   loadSpinner.start(colors.gray("Loading cookies from file..."));
@@ -409,9 +396,10 @@ export async function automaticLogin(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting automatic login process..."));
-  console.log();
+  Logger.success("[^] Starting automatic login process...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const loginSpinner = spinner();
   loginSpinner.start(colors.gray("Logging in to all Roblox instances..."));
@@ -486,9 +474,7 @@ export async function automaticLogin(): Promise<void> {
   const results = await Promise.all(loginTasks);
   loginSpinner.stop();
 
-  console.log();
-  console.log(colors.cyan("[*] " + colors.bold("Login Results by Device:")));
-  console.log();
+  Logger.title("[*] Login Results by Device:");
 
   const successfulLogins = results.filter((result) => result.isSuccess);
 
@@ -506,30 +492,28 @@ export async function automaticLogin(): Promise<void> {
       ? `${device.id} (${device.model})`
       : device.id;
 
-    console.log(colors.cyan(`[-] ${deviceName}:`));
+    Logger.info(`[-] ${deviceName}:`);
 
     if (deviceResults.length === 0) {
-      console.log(colors.gray(`   No Roblox instances found`));
+      Logger.muted("No Roblox instances found", { indent: 1 });
     } else {
       deviceResults.forEach((result) => {
         const appName = result.packageName.replace("com.roblox.", "");
 
         if (result.isSuccess && result.userInfo) {
-          console.log(
-            colors.green(`   [+] ${appName} - Successfully logged in`)
-          );
-          console.log(
-            colors.gray(`      Username: ${result.userInfo.userName}`)
-          );
-          console.log(colors.gray(`      User ID: ${result.userInfo.userId}`));
+          Logger.success(`[+] ${appName} - Successfully logged in`, {
+            indent: 1,
+          });
+          Logger.muted(`Username: ${result.userInfo.userName}`, { indent: 2 });
+          Logger.muted(`User ID: ${result.userInfo.userId}`, { indent: 2 });
         } else {
-          console.log(
-            colors.red(`   [X] ${appName} - ${result.error || "Login failed"}`)
-          );
+          Logger.error(`[X] ${appName} - ${result.error || "Login failed"}`, {
+            indent: 1,
+          });
         }
       });
     }
-    console.log();
+    Logger.space();
   }
 
   if (successfulLogins.length === allClones.length) {

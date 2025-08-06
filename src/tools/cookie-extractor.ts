@@ -10,8 +10,24 @@ import {
 } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
+
+// PowerShell decryption script template
+const POWERSHELL_DECRYPT_SCRIPT = `
+try {
+    Add-Type -AssemblyName System.Security
+    $encryptedBytes = [System.IO.File]::ReadAllBytes("{{ENCRYPTED_PATH}}")
+    $entropy = @({{ENTROPY_BYTES}})
+    $decryptedBytes = [System.Security.Cryptography.ProtectedData]::Unprotect($encryptedBytes, $entropy, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+    [System.IO.File]::WriteAllBytes("{{DECRYPTED_PATH}}", $decryptedBytes)
+    Write-Output "SUCCESS: Decryption completed"
+} catch {
+    Write-Error "FAILED: $($_.Exception.Message)"
+    exit 1
+}
+`;
 
 interface RobloxAccount {
   Valid: boolean;
@@ -98,25 +114,16 @@ async function decryptAccountData(filePath: string): Promise<string> {
       const entropyBytes = Array.from(ENTROPY)
         .map((b) => `0x${b.toString(16).padStart(2, "0")}`)
         .join(",");
-      const psScript = `
-try {
-    Add-Type -AssemblyName System.Security
-    $encryptedBytes = [System.IO.File]::ReadAllBytes("${tempEncryptedPath.replace(
-      /\\/g,
-      "\\\\"
-    )}")
-    $entropy = @(${entropyBytes})
-    $decryptedBytes = [System.Security.Cryptography.ProtectedData]::Unprotect($encryptedBytes, $entropy, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
-    [System.IO.File]::WriteAllBytes("${tempDecryptedPath.replace(
-      /\\/g,
-      "\\\\"
-    )}", $decryptedBytes)
-    Write-Output "SUCCESS: Decryption completed"
-} catch {
-    Write-Error "FAILED: $($_.Exception.Message)"
-    exit 1
-}
-`;
+
+      const psScript = POWERSHELL_DECRYPT_SCRIPT.replace(
+        "{{ENCRYPTED_PATH}}",
+        tempEncryptedPath.replace(/\\/g, "\\\\")
+      )
+        .replace("{{ENTROPY_BYTES}}", entropyBytes)
+        .replace(
+          "{{DECRYPTED_PATH}}",
+          tempDecryptedPath.replace(/\\/g, "\\\\")
+        );
 
       writeFileSync(tempScriptPath, psScript);
 
@@ -153,7 +160,7 @@ try {
           unlinkSync(tempDecryptedPath);
         }
       } catch (e) {
-        console.log(colors.gray(`Warning: Could not delete temp files: ${e}`));
+        Logger.warning(`Could not delete temp files: ${e}`);
       }
     }
   } catch (error) {
@@ -218,32 +225,20 @@ function generateCookieFile(
 }
 
 export async function extractRobloxCookies(): Promise<void> {
-  console.log();
-  console.log(
-    colors.cyan(
-      "[*] " + colors.bold("Cookie Extractor - Roblox Account Manager")
-    )
-  );
-  console.log(
-    colors.gray("   Extract SecurityTokens from encrypted AccountData.json")
-  );
-  console.log();
+  Logger.title("[*] Cookie Extractor - Roblox Account Manager");
+  Logger.muted("Extract SecurityTokens from encrypted AccountData.json", {
+    indent: 1,
+  });
 
-  console.log(
-    colors.yellow(
-      "[!] WARNING: Do NOT share the extracted cookies with anyone!"
-    )
+  Logger.warning(
+    "[!] WARNING: Do NOT share the extracted cookies with anyone!"
   );
-  console.log(
-    colors.yellow(
-      "   They can be used to steal your accounts, Robux, or get accounts terminated!"
-    )
+  Logger.warning(
+    "They can be used to steal your accounts, Robux, or get accounts terminated!",
+    { indent: 1 }
   );
-  console.log();
 
-  console.log(
-    colors.gray("[@] Please specify your AccountData.json file path...")
-  );
+  Logger.muted("[@] Please specify your AccountData.json file path...");
   const accountDataPath = await getAccountDataPath();
 
   if (!accountDataPath) {
@@ -251,9 +246,7 @@ export async function extractRobloxCookies(): Promise<void> {
     return;
   }
 
-  console.log(
-    colors.green(`[+] Using AccountData.json at: ${accountDataPath}`)
-  );
+  Logger.success(`[+] Using AccountData.json at: ${accountDataPath}`);
 
   const extractSpinner = spinner();
   extractSpinner.start(colors.gray("Decrypting AccountData.json..."));
@@ -288,36 +281,31 @@ export async function extractRobloxCookies(): Promise<void> {
   const validAccounts = accounts.filter((acc) => acc.Valid);
   const invalidAccounts = accounts.filter((acc) => !acc.Valid);
 
-  console.log();
-  console.log(colors.cyan("[#] Account Summary:"));
-  console.log(colors.gray(`   Total accounts: ${accounts.length}`));
-  console.log(colors.green(`   Valid accounts: ${validAccounts.length}`));
+  Logger.info("[#] Account Summary:", { spaceBefore: true });
+  Logger.muted(`Total accounts: ${accounts.length}`, { indent: 1 });
+  Logger.success(`Valid accounts: ${validAccounts.length}`, { indent: 1 });
   if (invalidAccounts.length > 0) {
-    console.log(colors.red(`   Invalid accounts: ${invalidAccounts.length}`));
+    Logger.error(`Invalid accounts: ${invalidAccounts.length}`, { indent: 1 });
   }
-  console.log();
 
-  console.log(colors.cyan("[-] Account Details:"));
+  Logger.info("[-] Account Details:", { spaceBefore: true });
   accounts.forEach((account, index) => {
     const statusColor = account.Valid ? colors.green : colors.red;
     const status = account.Valid ? "VALID" : "INVALID";
-    console.log(
-      `   ${colors.cyan((index + 1).toString())}. ${colors.white(
+    Logger.normal(
+      `${colors.cyan((index + 1).toString())}. ${colors.white(
         account.Username
-      )} ${statusColor(`[${status}]`)}`
+      )} ${statusColor(`[${status}]`)}`,
+      { indent: 1 }
     );
-    console.log(
-      colors.gray(
-        `      User ID: ${account.UserID} | Group: ${account.Group} | Region: ${account.Region}`
-      )
+    Logger.muted(
+      `User ID: ${account.UserID} | Group: ${account.Group} | Region: ${account.Region}`,
+      { indent: 2 }
     );
-    console.log(
-      colors.gray(
-        `      Last Use: ${new Date(account.LastUse).toLocaleString()}`
-      )
-    );
+    Logger.muted(`Last Use: ${new Date(account.LastUse).toLocaleString()}`, {
+      indent: 2,
+    });
   });
-  console.log();
 
   const saveSpinner = spinner();
   saveSpinner.start(colors.gray("Generating cookie file..."));
@@ -337,18 +325,18 @@ export async function extractRobloxCookies(): Promise<void> {
 
     saveSpinner.stop(colors.green("[+] Cookie file generated"));
 
-    console.log();
-    console.log(colors.green("Cookie extraction completed!"));
-    console.log(colors.gray(`   File saved: ${filename}`));
-    console.log(colors.gray(`   Location: ${outputPath}`));
-    console.log();
+    Logger.success("Cookie extraction completed!", { spaceBefore: true });
+    Logger.muted(`File saved: ${filename}`, { indent: 1 });
+    Logger.muted(`Location: ${outputPath}`, { indent: 1 });
 
     if (validAccounts.length > 0) {
-      console.log(
-        colors.cyan("[*] You can now use these cookies for Roblox automation")
-      );
+      Logger.info("[*] You can now use these cookies for Roblox automation", {
+        spaceBefore: true,
+      });
     } else {
-      console.log(colors.yellow("[!] No valid cookies found to extract"));
+      Logger.warning("[!] No valid cookies found to extract", {
+        spaceBefore: true,
+      });
     }
   } catch (error) {
     saveSpinner.stop(colors.red("[X] Failed to generate cookie file"));

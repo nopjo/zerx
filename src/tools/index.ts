@@ -16,6 +16,7 @@ import { optimizeDevices } from "./optimize-devices";
 import { robloxLauncher } from "./roblox-launcher";
 import { deleteRobloxConfig } from "./delete-roblox-config";
 import { systemResourceMonitor } from "./system-resource-manager";
+import { Logger } from "@/utils/logger";
 
 interface Tool {
   value: string;
@@ -151,16 +152,15 @@ export async function runTool(): Promise<void> {
       try {
         await selectedTool.handler();
       } catch (error) {
-        console.log(
-          colors.red(
-            `[X] Tool error: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
-          )
+        Logger.error(
+          `Tool error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          { spaceBefore: true }
         );
       }
 
-      console.log();
+      Logger.space();
       await confirm({
         message: "Press Enter to return to main menu",
         initialValue: true,

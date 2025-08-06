@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { getLDPlayerPath } from "@/utils/ld";
 import { getLDPlayerInstances, type LDPlayerInstance } from "@/utils/ld";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -56,9 +57,10 @@ const resolutionOptions = [
 ];
 
 async function getCustomConfiguration() {
-  console.log();
-  console.log(colors.cyan("[>] Device Optimization Configuration"));
-  console.log();
+  Logger.info("[>] Device Optimization Configuration", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const cores = await select({
     message: "Select CPU cores:",
@@ -108,39 +110,36 @@ async function optimizeInstance(
 
   try {
     if (instance.status === "Running") {
-      console.log(colors.gray(`    [>] Stopping ${instance.name}...`));
+      Logger.muted(`[>] Stopping ${instance.name}...`, { indent: 1 });
       await execAsync(`"${ldPath}" quit --index ${instance.index}`);
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
-    console.log(colors.gray(`    [>] Optimizing ${instance.name}...`));
+    Logger.muted(`[>] Optimizing ${instance.name}...`, { indent: 1 });
     await execAsync(
       `"${ldPath}" modify --index ${instance.index} --resolution ${config.resolution} --cpu ${config.cores} --memory ${config.ram}`
     );
 
-    console.log(colors.gray(`    [+] ${instance.name} optimized`));
+    Logger.muted(`[+] ${instance.name} optimized`, { indent: 1 });
     result.isSuccess = true;
     return result;
   } catch (error) {
     result.error = error instanceof Error ? error.message : "Unknown error";
-    console.log(
-      colors.red(`    [X] Failed to optimize ${instance.name}: ${result.error}`)
-    );
+    Logger.error(`[X] Failed to optimize ${instance.name}: ${result.error}`, {
+      indent: 1,
+    });
     return result;
   }
 }
 
 export async function optimizeDevices(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[*] " + colors.bold("Optimize Devices")));
-  console.log(
-    colors.gray(
-      "   Configure CPU, RAM, and resolution settings for your instances"
-    )
+  Logger.title("[*] Optimize Devices");
+  Logger.muted(
+    "Configure CPU, RAM, and resolution settings for your instances",
+    { indent: 1 }
   );
-  console.log();
 
-  console.log(colors.gray("[>] Getting your LDPlayer installation path..."));
+  Logger.muted("[>] Getting your LDPlayer installation path...");
   const ldPath = await getLDPlayerPath();
 
   if (!ldPath) {
@@ -148,7 +147,7 @@ export async function optimizeDevices(): Promise<void> {
     return;
   }
 
-  console.log(colors.green(`[+] Using LDPlayer at: ${ldPath}`));
+  Logger.success(`[+] Using LDPlayer at: ${ldPath}`);
 
   const loadingSpinner = spinner();
   loadingSpinner.start(colors.gray("Loading LDPlayer instances..."));
@@ -177,18 +176,18 @@ export async function optimizeDevices(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.cyan("[#] Available LDPlayer Instances:"));
+  Logger.info("[#] Available LDPlayer Instances:", { spaceBefore: true });
   for (const instance of instances) {
     const statusColor =
       instance.status === "Running" ? colors.green : colors.gray;
-    console.log(
-      `   ${colors.cyan(instance.index.toString())}. ${colors.white(
+    Logger.normal(
+      `${colors.cyan(instance.index.toString())}. ${colors.white(
         instance.name
-      )} ${statusColor(`[${instance.status}]`)}`
+      )} ${statusColor(`[${instance.status}]`)}`,
+      { indent: 1 }
     );
   }
-  console.log();
+  Logger.space();
 
   const config = await getCustomConfiguration();
   if (!config) {
@@ -196,42 +195,35 @@ export async function optimizeDevices(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.yellow("[>] " + colors.bold("Selected Configuration:")));
-  console.log(colors.gray(`   CPU Cores: ${config.cores}`));
-  console.log(colors.gray(`   RAM: ${config.ram} MB`));
-  console.log(
-    colors.gray(
-      `   Resolution: ${config.resolution.replace(/,/g, "x").replace(/x(\d+)$/, " @ $1 DPI")}`
-    )
+  Logger.warning("[>] Selected Configuration:", { spaceBefore: true });
+  Logger.muted(`CPU Cores: ${config.cores}`, { indent: 1 });
+  Logger.muted(`RAM: ${config.ram} MB`, { indent: 1 });
+  Logger.muted(
+    `Resolution: ${config.resolution.replace(/,/g, "x").replace(/x(\d+)$/, " @ $1 DPI")}`,
+    { indent: 1 }
   );
-  console.log();
-  console.log(colors.yellow("[!] " + colors.bold("Important Notes:")));
-  console.log(
-    colors.gray("   • Each Roblox instance uses ~0.7 CPU cores and ~1GB RAM")
-  );
-  console.log(
-    colors.gray("   • 4GB+ RAM recommended for running 3+ Roblox instances")
-  );
-  console.log(colors.gray("   • Performance is highly game dependent"));
-  console.log(colors.gray("   • Complex games require more resources"));
-  console.log(colors.gray("   • Monitor system resources during use"));
-  console.log();
+
+  Logger.warning("[!] Important Notes:", { spaceBefore: true });
+  Logger.muted("• Each Roblox instance uses ~0.7 CPU cores and ~1GB RAM", {
+    indent: 1,
+  });
+  Logger.muted("• 4GB+ RAM recommended for running 3+ Roblox instances", {
+    indent: 1,
+  });
+  Logger.muted("• Performance is highly game dependent", { indent: 1 });
+  Logger.muted("• Complex games require more resources", { indent: 1 });
+  Logger.muted("• Monitor system resources during use", { indent: 1 });
 
   const runningInstances = instances.filter((i) => i.status === "Running");
   if (runningInstances.length > 0) {
-    console.log(
-      colors.yellow("[!] " + colors.bold("Running Instances Notice:"))
+    Logger.warning("[!] Running Instances Notice:", { spaceBefore: true });
+    Logger.muted(
+      `${runningInstances.length} instance(s) are currently running`,
+      { indent: 1 }
     );
-    console.log(
-      colors.gray(
-        `   ${runningInstances.length} instance(s) are currently running`
-      )
-    );
-    console.log(
-      colors.gray("   These will be temporarily stopped to apply settings")
-    );
-    console.log();
+    Logger.muted("These will be temporarily stopped to apply settings", {
+      indent: 1,
+    });
   }
 
   const optimizeMode = await select({
@@ -291,9 +283,10 @@ export async function optimizeDevices(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting optimization process..."));
-  console.log();
+  Logger.success("[^] Starting optimization process...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const optimizeSpinner = spinner();
   optimizeSpinner.start(colors.gray("Optimizing instances..."));
@@ -308,32 +301,24 @@ export async function optimizeDevices(): Promise<void> {
 
   optimizeSpinner.stop();
 
-  console.log();
-  console.log(colors.cyan("[*] " + colors.bold("Optimization Results:")));
-  console.log();
+  Logger.title("[*] Optimization Results:");
 
   const successfulOptimizations = results.filter((result) => result.isSuccess);
 
   for (const result of results) {
     if (result.isSuccess) {
       const runningNote = result.wasRunning ? " (was restarted)" : "";
-      console.log(
-        colors.green(
-          `   [+] ${result.instanceName} - Optimized with custom settings${runningNote}`
-        )
+      Logger.success(
+        `[+] ${result.instanceName} - Optimized with custom settings${runningNote}`,
+        { indent: 1 }
       );
     } else {
-      console.log(
-        colors.red(
-          `   [X] ${result.instanceName} - ${
-            result.error || "Optimization failed"
-          }`
-        )
+      Logger.error(
+        `[X] ${result.instanceName} - ${result.error || "Optimization failed"}`,
+        { indent: 1 }
       );
     }
   }
-
-  console.log();
 
   const previouslyRunning = results.filter((r) => r.wasRunning && r.isSuccess);
   if (previouslyRunning.length > 0) {
@@ -353,10 +338,8 @@ export async function optimizeDevices(): Promise<void> {
           await execAsync(`"${ldPath}" launch --index ${result.instanceIndex}`);
           await new Promise((resolve) => setTimeout(resolve, 2000));
         } catch (error) {
-          console.log(
-            colors.yellow(
-              `[!] Failed to restart ${result.instanceName}: ${error}`
-            )
+          Logger.warning(
+            `[!] Failed to restart ${result.instanceName}: ${error}`
           );
         }
       }
@@ -364,8 +347,6 @@ export async function optimizeDevices(): Promise<void> {
       restartSpinner.stop(colors.green("[+] Restart complete"));
     }
   }
-
-  console.log();
 
   if (successfulOptimizations.length === instancesToOptimize.length) {
     outro(

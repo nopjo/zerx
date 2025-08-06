@@ -13,20 +13,15 @@ import {
   renameInstance,
   type LDPlayerInstance,
 } from "@/utils/ld";
+import { Logger } from "@/utils/logger";
 
 export async function cloneVirtualMachine(): Promise<void> {
-  console.log();
-  console.log(
-    colors.cyan("[-] " + colors.bold("LDPlayer Clone Virtual Machine"))
-  );
-  console.log(
-    colors.gray("   Create VM backups and restore them to new instances")
-  );
-  console.log();
+  Logger.title("[-] LDPlayer Clone Virtual Machine");
+  Logger.muted("Create VM backups and restore them to new instances", {
+    indent: 1,
+  });
 
-  console.log(
-    colors.gray("[>] Please specify your LDPlayer installation path...")
-  );
+  Logger.muted("[>] Please specify your LDPlayer installation path...");
   const ldPath = await getLDPlayerPath();
 
   if (!ldPath) {
@@ -34,7 +29,7 @@ export async function cloneVirtualMachine(): Promise<void> {
     return;
   }
 
-  console.log(colors.green(`[+] Using LDPlayer at: ${ldPath}`));
+  Logger.success(`[+] Using LDPlayer at: ${ldPath}`);
 
   const loadingSpinner = spinner();
   loadingSpinner.start(colors.gray("Loading LDPlayer instances..."));
@@ -63,18 +58,18 @@ export async function cloneVirtualMachine(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.cyan("[#] Available LDPlayer Instances:"));
+  Logger.info("[#] Available LDPlayer Instances:", { spaceBefore: true });
   for (const instance of instances) {
     const statusColor =
       instance.status === "Running" ? colors.green : colors.gray;
-    console.log(
-      `   ${colors.cyan(instance.index.toString())}. ${colors.white(
+    Logger.normal(
+      `${colors.cyan(instance.index.toString())}. ${colors.white(
         instance.name
-      )} ${statusColor(`[${instance.status}]`)}`
+      )} ${statusColor(`[${instance.status}]`)}`,
+      { indent: 1 }
     );
   }
-  console.log();
+  Logger.space();
 
   const instanceOptions = instances.map((instance) => ({
     value: instance.name,
@@ -147,9 +142,10 @@ export async function cloneVirtualMachine(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting clone operation..."));
-  console.log();
+  Logger.success("[^] Starting clone operation...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const backupDir = path.join(process.cwd(), "ldplayer_backups");
   if (!existsSync(backupDir)) {
@@ -223,26 +219,20 @@ export async function cloneVirtualMachine(): Promise<void> {
         );
       } catch (error) {
         cloneStepSpinner.stop(colors.red(`[X] Failed to create clone ${i}`));
-        console.log(
-          colors.red(
-            `   Error: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
-          )
+        Logger.error(
+          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          { indent: 1 }
         );
       }
     }
 
-    console.log();
-    console.log(colors.green("Clone operation completed!"));
-    console.log(colors.gray(`   Backup saved: ${backupPath}`));
+    Logger.success("Clone operation completed!", { spaceBefore: true });
+    Logger.muted(`Backup saved: ${backupPath}`, { indent: 1 });
   } catch (error) {
-    console.log();
-    console.log(colors.red("[X] Clone operation failed"));
-    console.log(
-      colors.red(
-        `   Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
+    Logger.error("Clone operation failed", { spaceBefore: true });
+    Logger.error(
+      `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { indent: 1 }
     );
   }
 

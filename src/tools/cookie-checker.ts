@@ -5,6 +5,7 @@ import { promisify } from "util";
 import { writeFileSync } from "fs";
 import { getConnectedDevices, printConnectedDevices } from "@/utils/adb";
 import { validateRobloxCookie, type RobloxUserInfo } from "@/utils/roblox";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -43,10 +44,9 @@ async function detectRobloxInstances(
 
     return instances;
   } catch (error) {
-    console.log(
-      colors.gray(
-        `    [!] Could not detect Roblox instances on ${deviceId}: ${error}`
-      )
+    Logger.muted(
+      `[!] Could not detect Roblox instances on ${deviceId}: ${error}`,
+      { indent: 1 }
     );
 
     return [{ packageName: "com.roblox.client", deviceId }];
@@ -77,11 +77,7 @@ function printInstanceDetectionResults(
   deviceInstanceMap: Map<string, RobloxInstance[]>,
   devices: any[]
 ): void {
-  console.log();
-  console.log(
-    colors.cyan("[-] " + colors.bold("Roblox Instance Detection Results:"))
-  );
-  console.log();
+  Logger.title("[-] Roblox Instance Detection Results:");
 
   let totalInstances = 0;
 
@@ -92,33 +88,30 @@ function printInstanceDetectionResults(
       : device.id;
 
     if (instances.length > 0) {
-      console.log(
-        colors.green(
-          `   [-] ${deviceName}: ${instances.length} Roblox instance(s) found`
-        )
+      Logger.success(
+        `[-] ${deviceName}: ${instances.length} Roblox instance(s) found`,
+        { indent: 1 }
       );
       instances.forEach((instance) => {
         const appName =
           instance.packageName === "com.roblox.client"
             ? "client"
             : instance.packageName.replace("com.roblox.", "");
-        console.log(colors.gray(`      └── ${appName}`));
+        Logger.muted(`└── ${appName}`, { indent: 2 });
       });
       totalInstances += instances.length;
     } else {
-      console.log(
-        colors.yellow(`   [-] ${deviceName}: No Roblox instances found`)
-      );
+      Logger.warning(`[-] ${deviceName}: No Roblox instances found`, {
+        indent: 1,
+      });
     }
   }
 
-  console.log();
-  console.log(
-    colors.cyan(
-      `[#] Total Roblox instances across all devices: ${colors.bold(
-        totalInstances.toString()
-      )}`
-    )
+  Logger.info(
+    `[#] Total Roblox instances across all devices: ${colors.bold(
+      totalInstances.toString()
+    )}`,
+    { spaceBefore: true }
   );
 }
 
@@ -231,22 +224,18 @@ function saveCookies(cookies: string[], checkType: string): void {
   const content = uniqueCookies.join("\n") + "\n";
 
   writeFileSync(filename, content);
-  console.log(
-    colors.green(
-      `   [@] ${uniqueCookies.length} unique cookies saved to ${filename}`
-    )
+  Logger.success(
+    `[@] ${uniqueCookies.length} unique cookies saved to ${filename}`,
+    { indent: 1 }
   );
 }
 
 export async function checkRobloxCookies(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[*] " + colors.bold("Roblox Cookie Checker")));
-  console.log(
-    colors.gray(
-      "   Extract and validate Roblox cookies from all instances on connected devices"
-    )
+  Logger.title("[*] Roblox Cookie Checker");
+  Logger.muted(
+    "Extract and validate Roblox cookies from all instances on connected devices",
+    { indent: 1 }
   );
-  console.log();
 
   const s = spinner();
   s.start(colors.gray("Scanning for connected devices..."));
@@ -384,9 +373,10 @@ export async function checkRobloxCookies(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting cookie extraction and validation..."));
-  console.log();
+  Logger.success("[^] Starting cookie extraction and validation...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const checkSpinner = spinner();
   checkSpinner.start(
@@ -404,11 +394,7 @@ export async function checkRobloxCookies(): Promise<void> {
   const results = await Promise.all(checkPromises);
   checkSpinner.stop();
 
-  console.log();
-  console.log(
-    colors.cyan("[*] " + colors.bold("Cookie Check Results by Device:"))
-  );
-  console.log();
+  Logger.title("[*] Cookie Check Results by Device:");
 
   const validCookies = results.filter((result) => result.isValid);
   const allValidCookieStrings = results
@@ -433,7 +419,7 @@ export async function checkRobloxCookies(): Promise<void> {
       continue;
     }
 
-    console.log(colors.cyan(`[-] ${deviceName}:`));
+    Logger.info(`[-] ${deviceName}:`);
 
     deviceResults.forEach((result) => {
       const appName =
@@ -442,16 +428,16 @@ export async function checkRobloxCookies(): Promise<void> {
           : result.packageName.replace("com.roblox.", "");
 
       if (result.isValid && result.userInfo) {
-        console.log(colors.green(`   [+] ${appName} - Valid cookie found`));
-        console.log(colors.gray(`      Username: ${result.userInfo.userName}`));
-        console.log(colors.gray(`      User ID: ${result.userInfo.userId}`));
+        Logger.success(`[+] ${appName} - Valid cookie found`, { indent: 1 });
+        Logger.muted(`Username: ${result.userInfo.userName}`, { indent: 2 });
+        Logger.muted(`User ID: ${result.userInfo.userId}`, { indent: 2 });
       } else {
-        console.log(
-          colors.red(`   [X] ${appName} - ${result.error || "No valid cookie"}`)
-        );
+        Logger.error(`[X] ${appName} - ${result.error || "No valid cookie"}`, {
+          indent: 1,
+        });
       }
     });
-    console.log();
+    Logger.space();
   }
 
   if (allValidCookieStrings.length > 0) {

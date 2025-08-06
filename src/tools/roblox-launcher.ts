@@ -15,6 +15,7 @@ import {
   type GameConfig,
   type GameTemplate,
 } from "@/utils/config";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -121,10 +122,9 @@ async function checkRobloxPresence(
           }
         }
       } catch (error) {
-        console.log(
-          colors.gray(
-            `    [!] Cookie-based presence check failed, falling back to username lookup`
-          )
+        Logger.muted(
+          "[!] Cookie-based presence check failed, falling back to username lookup",
+          { indent: 1 }
         );
       }
     }
@@ -132,20 +132,18 @@ async function checkRobloxPresence(
     const exactUser = await searchRobloxUserByUsername(username);
 
     if (!exactUser) {
-      console.log(
-        colors.gray(`    [!] Exact user match not found for ${username}`)
-      );
+      Logger.muted(`[!] Exact user match not found for ${username}`, {
+        indent: 1,
+      });
       return false;
     }
 
     return await checkRobloxPresenceById(exactUser.id);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log(
-      colors.gray(
-        `    [!] Presence check failed for ${username}: ${errorMessage}`
-      )
-    );
+    Logger.muted(`[!] Presence check failed for ${username}: ${errorMessage}`, {
+      indent: 1,
+    });
     return false;
   }
 }
@@ -170,17 +168,16 @@ async function isDeviceResponsive(
     return stdout.trim() === "responsive";
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      console.log(
-        colors.yellow(
-          `    [!] Device ${deviceId} timeout after ${timeoutSeconds}s`
-        )
+      Logger.warning(
+        `[!] Device ${deviceId} timeout after ${timeoutSeconds}s`,
+        { indent: 1 }
       );
     } else {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.log(
-        colors.yellow(`    [!] Device ${deviceId} error: ${errorMessage}`)
-      );
+      Logger.warning(`[!] Device ${deviceId} error: ${errorMessage}`, {
+        indent: 1,
+      });
     }
     return false;
   }
@@ -188,17 +185,13 @@ async function isDeviceResponsive(
 
 async function rebootDevice(deviceId: string): Promise<boolean> {
   try {
-    console.log(
-      colors.yellow(`[~] Rebooting unresponsive device ${deviceId}...`)
-    );
+    Logger.warning(`[~] Rebooting unresponsive device ${deviceId}...`);
 
     await execAsync(`adb -s ${deviceId} reboot`);
 
-    console.log(
-      colors.gray(
-        `    [~] Waiting for device ${deviceId} to come back online...`
-      )
-    );
+    Logger.muted(`[~] Waiting for device ${deviceId} to come back online...`, {
+      indent: 1,
+    });
 
     for (let i = 0; i < 24; i++) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -207,19 +200,19 @@ async function rebootDevice(deviceId: string): Promise<boolean> {
         (d) => d.id === deviceId && d.status === "device"
       );
       if (device) {
-        console.log(colors.green(`    [+] Device ${deviceId} is back online`));
+        Logger.success(`[+] Device ${deviceId} is back online`, { indent: 1 });
         return true;
       }
     }
 
-    console.log(
-      colors.red(`    [X] Device ${deviceId} failed to come back online`)
-    );
+    Logger.error(`[X] Device ${deviceId} failed to come back online`, {
+      indent: 1,
+    });
     return false;
   } catch (error) {
-    console.log(
-      colors.red(`    [X] Failed to reboot device ${deviceId}: ${error}`)
-    );
+    Logger.error(`[X] Failed to reboot device ${deviceId}: ${error}`, {
+      indent: 1,
+    });
     return false;
   }
 }
@@ -239,10 +232,9 @@ async function detectRobloxInstances(
 
     return packages.map((packageName) => ({ packageName, deviceId }));
   } catch (error) {
-    console.log(
-      colors.gray(
-        `    [!] Could not detect Roblox instances on ${deviceId}: ${error}`
-      )
+    Logger.muted(
+      `[!] Could not detect Roblox instances on ${deviceId}: ${error}`,
+      { indent: 1 }
     );
     return [{ packageName: "com.roblox.client", deviceId }];
   }
@@ -311,12 +303,11 @@ async function launchRobloxGame(
 
     if (!launchUrl) return false;
 
-    console.log(
-      colors.gray(
-        `    [>] Launching: ${
-          gameConfig.gameName || "Game"
-        } on ${packageName.replace("com.roblox.", "")}`
-      )
+    Logger.muted(
+      `[>] Launching: ${
+        gameConfig.gameName || "Game"
+      } on ${packageName.replace("com.roblox.", "")}`,
+      { indent: 1 }
     );
 
     await execAsync(
@@ -326,7 +317,7 @@ async function launchRobloxGame(
     await new Promise((resolve) => setTimeout(resolve, 3000));
     return true;
   } catch (error) {
-    console.log(colors.red(`    [X] Launch failed: ${error}`));
+    Logger.error(`[X] Launch failed: ${error}`, { indent: 1 });
     return false;
   }
 }
@@ -375,10 +366,9 @@ async function getDeviceStatuses(): Promise<DeviceStatus[]> {
           now - cacheEntry.lastCookieCheck > COOKIE_CACHE_DURATION_MS;
 
         if (shouldCheckCookie) {
-          console.log(
-            colors.gray(
-              `   [@] Checking cookies for ${instance.packageName} on ${device.id}...`
-            )
+          Logger.muted(
+            `[@] Checking cookies for ${instance.packageName} on ${device.id}...`,
+            { indent: 1 }
           );
           const instanceUsername = await getUsernameFromInstance(
             device.id,
@@ -408,10 +398,9 @@ async function getDeviceStatuses(): Promise<DeviceStatus[]> {
           const cacheAgeMinutes = Math.floor(
             (now - cacheEntry.lastCookieCheck) / (60 * 1000)
           );
-          console.log(
-            colors.gray(
-              `   [+] Using cached username for ${instance.packageName} on ${device.id} (${cacheAgeMinutes}m old)`
-            )
+          Logger.muted(
+            `[+] Using cached username for ${instance.packageName} on ${device.id} (${cacheAgeMinutes}m old)`,
+            { indent: 1 }
           );
         }
 
@@ -472,12 +461,10 @@ async function getDeviceStatuses(): Promise<DeviceStatus[]> {
 }
 
 function displayDeviceStatuses(statuses: DeviceStatus[]): void {
-  console.log();
-  console.log(colors.cyan("[>] " + colors.bold("Device & Instance Status")));
-  console.log();
+  Logger.title("[>] Device & Instance Status");
 
   if (statuses.length === 0) {
-    console.log(colors.yellow("[-] No devices found"));
+    Logger.warning("[-] No devices found");
     return;
   }
 
@@ -492,10 +479,8 @@ function displayDeviceStatuses(statuses: DeviceStatus[]): void {
       ? colors.green("[+] Responsive")
       : colors.red("[X] Unresponsive");
 
-    console.log(
-      colors.cyan(
-        `[-] ${deviceName}: ${status.instances.length} instance(s) - ${responsiveStatus}`
-      )
+    Logger.info(
+      `[-] ${deviceName}: ${status.instances.length} instance(s) - ${responsiveStatus}`
     );
 
     for (const instance of status.instances) {
@@ -522,24 +507,22 @@ function displayDeviceStatuses(statuses: DeviceStatus[]): void {
             : colors.yellow("[X] Not In Game")
           : "";
 
-      console.log(`   └── ${colors.white(appName)}`);
-      console.log(`       Roblox: ${robloxStatus}`);
-      console.log(`       User: ${username}`);
-      console.log(`       Game: ${colors.cyan(gameInfo)}`);
+      Logger.normal(`└── ${colors.white(appName)}`, { indent: 1 });
+      Logger.muted(`Roblox: ${robloxStatus}`, { indent: 2 });
+      Logger.muted(`User: ${username}`, { indent: 2 });
+      Logger.muted(`Game: ${colors.cyan(gameInfo)}`, { indent: 2 });
       if (presenceInfo) {
-        console.log(`       Presence: ${presenceInfo}`);
+        Logger.muted(`Presence: ${presenceInfo}`, { indent: 2 });
       }
-      console.log();
+      Logger.space();
       totalInstances++;
     }
   }
 
-  console.log(
-    colors.cyan(
-      `Total instances across all devices: ${colors.bold(
-        totalInstances.toString()
-      )}`
-    )
+  Logger.info(
+    `Total instances across all devices: ${colors.bold(
+      totalInstances.toString()
+    )}`
   );
 }
 
@@ -605,7 +588,7 @@ async function assignGameToUsername(): Promise<void> {
     });
 
     if (allUsernames.size === 0) {
-      console.log(colors.red("[X] No logged-in users found"));
+      Logger.error("[X] No logged-in users found");
       return;
     }
 
@@ -669,10 +652,8 @@ async function assignGameToUsername(): Promise<void> {
           (a) => a.username !== selectedUsername
         );
       saveRobloxLauncherConfig(launcherConfig);
-      console.log(
-        colors.green(`[+] Game assignment removed for @${selectedUsername}!`)
-      );
-      console.log();
+      Logger.success(`[+] Game assignment removed for @${selectedUsername}!`);
+      Logger.space();
       continue;
     }
 
@@ -680,10 +661,10 @@ async function assignGameToUsername(): Promise<void> {
 
     if (gameType === "template") {
       if (launcherConfig.gameTemplates.length === 0) {
-        console.log(colors.yellow("[!] No saved game templates found"));
-        console.log(
-          colors.gray("   Create templates using 'Manage Game Templates' first")
-        );
+        Logger.warning("[!] No saved game templates found");
+        Logger.muted("Create templates using 'Manage Game Templates' first", {
+          indent: 1,
+        });
         continue;
       }
 
@@ -717,7 +698,7 @@ async function assignGameToUsername(): Promise<void> {
       if (template) {
         gameConfig = { ...template.gameConfig };
       } else {
-        console.log(colors.red("[X] Template not found"));
+        Logger.error("[X] Template not found");
         continue;
       }
     } else {
@@ -741,16 +722,14 @@ async function assignGameToUsername(): Promise<void> {
     }
 
     saveRobloxLauncherConfig(launcherConfig);
-    console.log(
-      colors.green(`[+] Game assignment saved for @${selectedUsername}!`)
-    );
-    console.log();
+    Logger.success(`[+] Game assignment saved for @${selectedUsername}!`);
+    Logger.space();
 
     const assignAnother = await confirm({
       message: "Assign game to another username?",
     });
     if (!assignAnother) break;
-    console.log();
+    Logger.space();
   }
 }
 
@@ -763,7 +742,7 @@ async function launchAssignedGames(): Promise<void> {
   );
 
   if (instancesWithGames.length === 0) {
-    console.log(colors.yellow("[!] No instances have assigned games"));
+    Logger.warning("[!] No instances have assigned games");
     return;
   }
 
@@ -772,9 +751,10 @@ async function launchAssignedGames(): Promise<void> {
   });
   if (!shouldLaunch) return;
 
-  console.log();
-  console.log(colors.green("[^] Launching games..."));
-  console.log();
+  Logger.success("[^] Launching games...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   for (const instance of instancesWithGames) {
     const deviceStatus = statuses.find((d) => d.deviceId === instance.deviceId);
@@ -786,9 +766,7 @@ async function launchAssignedGames(): Promise<void> {
         ? "client"
         : instance.packageName.replace("com.roblox.", "");
 
-    console.log(
-      colors.cyan(`[-] ${deviceName} - ${appName} (@${instance.username})`)
-    );
+    Logger.info(`[-] ${deviceName} - ${appName} (@${instance.username})`);
 
     if (instance.assignedGame) {
       const success = await launchRobloxGame(
@@ -796,24 +774,25 @@ async function launchAssignedGames(): Promise<void> {
         instance.packageName,
         instance.assignedGame
       );
-      console.log(
+      Logger.normal(
         success
           ? colors.green(`   [+] Successfully launched`)
-          : colors.red(`   [X] Launch failed`)
+          : colors.red(`   [X] Launch failed`),
+        { indent: 1 }
       );
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
-  console.log();
-  console.log(colors.green("Launch sequence complete!"));
+  Logger.success("Launch sequence complete!", { spaceBefore: true });
 }
 
 async function createGameTemplate(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[+] Create New Game Template"));
-  console.log();
+  Logger.info("[+] Create New Game Template", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const templateName = await text({
     message: "Enter template name:",
@@ -852,24 +831,20 @@ async function createGameTemplate(): Promise<void> {
 
   launcherConfig.gameTemplates.push(template);
   saveRobloxLauncherConfig(launcherConfig);
-  console.log(
-    colors.green(`[+] Template "${templateName}" created successfully!`)
-  );
+  Logger.success(`[+] Template "${templateName}" created successfully!`);
 }
 
 async function manageGameTemplates(): Promise<void> {
   while (true) {
     const launcherConfig = getRobloxLauncherConfig();
 
-    console.log();
-    console.log(colors.cyan("[#] " + colors.bold("Manage Game Templates")));
-    console.log(
-      colors.gray("   Create and manage reusable game configurations")
-    );
-    console.log();
+    Logger.title("[#] Manage Game Templates");
+    Logger.muted("Create and manage reusable game configurations", {
+      indent: 1,
+    });
 
     if (launcherConfig.gameTemplates.length > 0) {
-      console.log(colors.cyan("[#] Saved Templates:"));
+      Logger.info("[#] Saved Templates:");
       launcherConfig.gameTemplates.forEach((template, index) => {
         const gameType = template.gameConfig.privateServerLink
           ? "[*] Private Server"
@@ -877,14 +852,16 @@ async function manageGameTemplates(): Promise<void> {
         const gameInfo = template.gameConfig.privateServerLink
           ? template.gameConfig.privateServerLink.substring(0, 50) + "..."
           : template.gameConfig.gameId;
-        console.log(colors.white(`   ${index + 1}. ${template.name}`));
-        console.log(colors.gray(`      Type: ${gameType}`));
-        console.log(colors.gray(`      Info: ${gameInfo}`));
-        console.log();
+        Logger.normal(`${index + 1}. ${template.name}`, { indent: 1 });
+        Logger.muted(`Type: ${gameType}`, { indent: 2 });
+        Logger.muted(`Info: ${gameInfo}`, { indent: 2 });
+        Logger.space();
       });
     } else {
-      console.log(colors.yellow("[#] No templates saved yet"));
-      console.log();
+      Logger.warning("[#] No templates saved yet", {
+        spaceBefore: true,
+        spaceAfter: true,
+      });
     }
 
     const action = await select({
@@ -935,9 +912,7 @@ async function manageGameTemplates(): Promise<void> {
         (t) => t.id !== selectedTemplate
       );
       saveRobloxLauncherConfig(launcherConfig);
-      console.log(
-        colors.green(`[+] Template "${template.name}" deleted successfully!`)
-      );
+      Logger.success(`[+] Template "${template.name}" deleted successfully!`);
     } else if (action === "edit") {
       const templateOptions = launcherConfig.gameTemplates.map((template) => ({
         value: template.id,
@@ -978,22 +953,17 @@ async function manageGameTemplates(): Promise<void> {
 
       template.name = newName.toString();
       saveRobloxLauncherConfig(launcherConfig);
-      console.log(
-        colors.green(`[+] Template renamed to "${newName}" successfully!`)
-      );
+      Logger.success(`[+] Template renamed to "${newName}" successfully!`);
     }
   }
 }
 
 async function setDefaultGame(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[>] Set Default Game"));
-  console.log(
-    colors.gray(
-      "   This game will be used for users without specific assignments"
-    )
+  Logger.info("[>] Set Default Game", { spaceBefore: true });
+  Logger.muted(
+    "This game will be used for users without specific assignments",
+    { indent: 1 }
   );
-  console.log();
 
   const gameType = await select({
     message: "What type of default game?",
@@ -1011,7 +981,7 @@ async function setDefaultGame(): Promise<void> {
   if (gameType === "remove") {
     launcherConfig.defaultGame = undefined;
     saveRobloxLauncherConfig(launcherConfig);
-    console.log(colors.green("[+] Default game removed"));
+    Logger.success("[+] Default game removed");
     return;
   }
 
@@ -1020,15 +990,13 @@ async function setDefaultGame(): Promise<void> {
 
   launcherConfig.defaultGame = gameConfig;
   saveRobloxLauncherConfig(launcherConfig);
-  console.log(colors.green("[+] Default game saved!"));
+  Logger.success("[+] Default game saved!");
 }
 
 async function configureAdvancedSettings(): Promise<void> {
   const launcherConfig = getRobloxLauncherConfig();
 
-  console.log();
-  console.log(colors.cyan("[>] " + colors.bold("Advanced Settings")));
-  console.log();
+  Logger.title("[>] Advanced Settings");
 
   const deviceTimeoutText = await text({
     message: "Device timeout (seconds):",
@@ -1060,7 +1028,7 @@ async function configureAdvancedSettings(): Promise<void> {
   launcherConfig.presenceCheckInterval = parseInt(presenceCheckText);
   saveRobloxLauncherConfig(launcherConfig);
 
-  console.log(colors.green("[+] Advanced settings saved!"));
+  Logger.success("[+] Advanced settings saved!");
 }
 
 async function checkPresenceForInstances(
@@ -1078,9 +1046,9 @@ async function checkPresenceForInstances(
       now - instance.lastPresenceCheck > PRESENCE_CACHE_DURATION_MS;
 
     if (shouldCheckPresence) {
-      console.log(
-        colors.gray(`   [*] Checking presence for @${instance.username}...`)
-      );
+      Logger.muted(`[*] Checking presence for @${instance.username}...`, {
+        indent: 1,
+      });
 
       const isInGame = await checkRobloxPresence(
         instance.username,
@@ -1101,16 +1069,11 @@ async function checkPresenceForInstances(
 async function keepAliveMode(): Promise<void> {
   const launcherConfig = getRobloxLauncherConfig();
 
-  console.log();
-  console.log(
-    colors.cyan("[~] " + colors.bold("Keep Alive Mode Configuration"))
+  Logger.title("[~] Keep Alive Mode Configuration");
+  Logger.muted(
+    "Set up automatic monitoring with crash detection and presence checking",
+    { indent: 1 }
   );
-  console.log(
-    colors.gray(
-      "   Set up automatic monitoring with crash detection and presence checking"
-    )
-  );
-  console.log();
 
   const intervalText = await text({
     message: "Check interval (seconds):",
@@ -1157,23 +1120,21 @@ async function keepAliveMode(): Promise<void> {
   launcherConfig.autoRebootInterval = autoRebootHours;
   saveRobloxLauncherConfig(launcherConfig);
 
-  console.log();
-  console.log(colors.green("[~] Keep Alive Mode Started"));
-  console.log(colors.gray(`   Checking every ${interval / 1000} seconds...`));
+  Logger.success("[~] Keep Alive Mode Started", { spaceBefore: true });
+  Logger.muted(`Checking every ${interval / 1000} seconds...`, { indent: 1 });
   if (autoRebootHours > 0) {
-    console.log(
-      colors.gray(`   Auto-rebooting LDPlayer every ${autoRebootHours} hours`)
-    );
+    Logger.muted(`Auto-rebooting LDPlayer every ${autoRebootHours} hours`, {
+      indent: 1,
+    });
   }
   if (enablePresenceCheck) {
-    console.log(
-      colors.gray(
-        `   Presence checking every ${launcherConfig.presenceCheckInterval} minutes`
-      )
+    Logger.muted(
+      `Presence checking every ${launcherConfig.presenceCheckInterval} minutes`,
+      { indent: 1 }
     );
   }
-  console.log(colors.gray("   Press Ctrl+C to stop"));
-  console.log();
+  Logger.muted("Press Ctrl+C to stop", { indent: 1 });
+  Logger.space();
 
   let lastRebootTime = Date.now();
   let lastPresenceCheck = Date.now();
@@ -1185,17 +1146,13 @@ async function keepAliveMode(): Promise<void> {
       const now = Date.now();
 
       if (autoRebootHours > 0 && now - lastRebootTime >= rebootIntervalMs) {
-        console.log(
-          colors.yellow(
-            `[~] ${autoRebootHours} hours passed - Starting auto-reboot...`
-          )
+        Logger.warning(
+          `[~] ${autoRebootHours} hours passed - Starting auto-reboot...`
         );
         await rebootAllLDPlayerInstances();
         lastRebootTime = now;
 
-        console.log(
-          colors.cyan("[>] Re-launching assigned games after reboot...")
-        );
+        Logger.info("[>] Re-launching assigned games after reboot...");
         const statuses = await getDeviceStatuses();
         const instancesWithGames = statuses.flatMap((device) =>
           device.instances.filter(
@@ -1216,10 +1173,9 @@ async function keepAliveMode(): Promise<void> {
                 ? "client"
                 : instance.packageName.replace("com.roblox.", "");
 
-            console.log(
-              colors.gray(
-                `   [>] Launching game on ${deviceName} - ${appName} (@${instance.username})...`
-              )
+            Logger.muted(
+              `[>] Launching game on ${deviceName} - ${appName} (@${instance.username})...`,
+              { indent: 1 }
             );
             await launchRobloxGame(
               instance.deviceId,
@@ -1229,18 +1185,16 @@ async function keepAliveMode(): Promise<void> {
             await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         }
-        console.log(colors.green("[+] Post-reboot game launches complete!"));
-        console.log();
+        Logger.success("[+] Post-reboot game launches complete!");
+        Logger.space();
       }
 
       let statuses = await getDeviceStatuses();
 
       for (const deviceStatus of statuses) {
         if (!deviceStatus.isResponsive) {
-          console.log(
-            colors.red(
-              `[X] Device ${deviceStatus.deviceId} is unresponsive, attempting reboot...`
-            )
+          Logger.error(
+            `[X] Device ${deviceStatus.deviceId} is unresponsive, attempting reboot...`
           );
           const rebootSuccess = await rebootDevice(deviceStatus.deviceId);
           if (rebootSuccess) {
@@ -1269,10 +1223,8 @@ async function keepAliveMode(): Promise<void> {
       );
 
       if (instancesWithGames.length === 0) {
-        console.log(
-          colors.yellow(
-            "[!] No instances with assigned games or all devices unresponsive, waiting..."
-          )
+        Logger.warning(
+          "[!] No instances with assigned games or all devices unresponsive, waiting..."
         );
         await new Promise((resolve) => setTimeout(resolve, interval));
         continue;
@@ -1283,7 +1235,7 @@ async function keepAliveMode(): Promise<void> {
         enablePresenceCheck &&
         now - lastPresenceCheck >= presenceIntervalMs
       ) {
-        console.log(colors.cyan("[*] Running presence checks..."));
+        Logger.info("[*] Running presence checks...");
         updatedInstancesWithGames =
           await checkPresenceForInstances(instancesWithGames);
         lastPresenceCheck = now;
@@ -1302,10 +1254,8 @@ async function keepAliveMode(): Promise<void> {
         );
       }
 
-      console.log(
-        colors.yellow(
-          `[~] ${timestamp} - Checking ${updatedInstancesWithGames.length} instances...${nextRebootInfo}`
-        )
+      Logger.warning(
+        `[~] ${timestamp} - Checking ${updatedInstancesWithGames.length} instances...${nextRebootInfo}`
       );
 
       for (const instance of updatedInstancesWithGames) {
@@ -1327,24 +1277,24 @@ async function keepAliveMode(): Promise<void> {
         if (shouldRelaunch && instance.assignedGame) {
           const reason = !instance.isRobloxRunning ? "stopped" : "not in game";
 
-          console.log(
-            colors.red(
-              `   [X] ${deviceName} - ${appName} (@${instance.username}) ${reason}, relaunching...`
-            )
+          Logger.error(
+            `[X] ${deviceName} - ${appName} (@${instance.username}) ${reason}, relaunching...`,
+            { indent: 1 }
           );
           const success = await launchRobloxGame(
             instance.deviceId,
             instance.packageName,
             instance.assignedGame
           );
-          console.log(
+          Logger.normal(
             success
               ? colors.green(
                   `   [+] ${deviceName} - ${appName} (@${instance.username}) relaunched`
                 )
               : colors.red(
                   `   [X] ${deviceName} - ${appName} (@${instance.username}) relaunch failed`
-                )
+                ),
+            { indent: 1 }
           );
           await new Promise((resolve) => setTimeout(resolve, 1000));
         } else {
@@ -1354,40 +1304,34 @@ async function keepAliveMode(): Promise<void> {
                 ? " (in game)"
                 : " (not in game)"
               : "";
-          console.log(
-            colors.green(
-              `   [+] ${deviceName} - ${appName} (@${instance.username}) running${statusInfo}`
-            )
+          Logger.success(
+            `[+] ${deviceName} - ${appName} (@${instance.username}) running${statusInfo}`,
+            { indent: 1 }
           );
         }
       }
 
-      console.log(
-        colors.gray(`   Next check in ${interval / 1000} seconds...`)
-      );
-      console.log();
+      Logger.muted(`Next check in ${interval / 1000} seconds...`, {
+        indent: 1,
+      });
+      Logger.space();
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
   } catch (error) {
     if (error instanceof Error && error.message.includes("SIGINT")) {
-      console.log();
-      console.log(colors.yellow("[!] Keep alive mode stopped"));
+      Logger.warning("[!] Keep alive mode stopped", { spaceBefore: true });
     } else {
-      console.log();
-      console.log(colors.red(`[X] Keep alive error: ${error}`));
+      Logger.error(`[X] Keep alive error: ${error}`, { spaceBefore: true });
     }
   }
 }
 
 export async function robloxLauncher(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[>] " + colors.bold("Roblox Auto Launcher")));
-  console.log(
-    colors.gray(
-      "   Launch games automatically with username-based assignments, crash detection, and presence monitoring"
-    )
+  Logger.title("[>] Roblox Auto Launcher");
+  Logger.muted(
+    "Launch games automatically with username-based assignments, crash detection, and presence monitoring",
+    { indent: 1 }
   );
-  console.log();
 
   const loadingSpinner = spinner();
   loadingSpinner.start(colors.gray("Loading device and instance statuses..."));

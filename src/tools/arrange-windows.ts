@@ -3,16 +3,15 @@ import colors from "picocolors";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { getLDPlayerPath } from "@/utils/ld";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
 export async function arrangeWindows(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[>] " + colors.bold("Arrange LDPlayer Windows")));
-  console.log(
-    colors.gray("   Automatically arrange all emulator windows on screen")
-  );
-  console.log();
+  Logger.title("[>] Arrange LDPlayer Windows");
+  Logger.muted("Automatically arrange all emulator windows on screen", {
+    indent: 1,
+  });
 
   const ldPath = await getLDPlayerPath();
 

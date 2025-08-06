@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import colors from "picocolors";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -39,19 +40,18 @@ export async function getConnectedDevices(): Promise<AdbDevice[]> {
 
     return devices;
   } catch (error) {
-    console.error(colors.red("[X] Error getting ADB devices:"), error);
+    Logger.error("[X] Error getting ADB devices:");
+    console.error(error);
     return [];
   }
 }
 
 export function printConnectedDevices(devices: AdbDevice[]): void {
-  console.log();
-  console.log(colors.cyan("[-] " + colors.bold("Connected Devices:")));
-  console.log();
+  Logger.title("[-] Connected Devices:");
 
   if (devices.length === 0) {
-    console.log(colors.yellow("[!] No devices found"));
-    console.log(colors.gray("   Make sure you have some devices running."));
+    Logger.warning("[!] No devices found");
+    Logger.muted("Make sure you have some devices running.", { indent: 1 });
     return;
   }
 
@@ -67,18 +67,14 @@ export function printConnectedDevices(devices: AdbDevice[]): void {
       ? `${device.id} (${device.model})`
       : device.id;
 
-    console.log(
-      colors.gray(`   ${index + 1}. `) +
-        colors.white(deviceInfo) +
-        " - " +
-        statusColor(colors.bold(device.status))
+    Logger.muted(
+      `${index + 1}. ${colors.white(deviceInfo)} - ${statusColor(colors.bold(device.status))}`,
+      { indent: 1 }
     );
   });
 
-  console.log();
-  console.log(
-    colors.gray(
-      `   Total: ${colors.white(devices.length.toString())} device(s)`
-    )
-  );
+  Logger.muted(`Total: ${colors.white(devices.length.toString())} device(s)`, {
+    indent: 1,
+    spaceBefore: true,
+  });
 }

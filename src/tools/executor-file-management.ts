@@ -9,6 +9,7 @@ import {
   printConnectedDevices,
   type AdbDevice,
 } from "@/utils/adb";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -82,9 +83,7 @@ async function checkExecutorExists(
           stdout.trim() === executorPath ||
           stdout.trim().endsWith(executorPath)
         ) {
-          console.log(
-            colors.green(`Found ${executorPath} using method: ${method}`)
-          );
+          Logger.success(`Found ${executorPath} using method: ${method}`);
           return true;
         }
       } catch (error) {
@@ -104,24 +103,20 @@ async function checkExecutorExists(
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line);
-      console.log(
-        colors.gray(`Found folders in ${parentPath}: ${folders.join(", ")}`)
-      );
+      Logger.muted(`Found folders in ${parentPath}: ${folders.join(", ")}`);
 
       const exists = folders.some((folder) => folder === folderName);
       if (exists) {
-        console.log(
-          colors.green(`Found ${folderName} in parent directory listing`)
-        );
+        Logger.success(`Found ${folderName} in parent directory listing`);
         return true;
       }
     } catch (error) {
-      console.log(colors.yellow(`Parent directory check failed: ${error}`));
+      Logger.warning(`Parent directory check failed: ${error}`);
     }
 
     return false;
   } catch (error) {
-    console.log(colors.red(`Error checking executor existence: ${error}`));
+    Logger.error(`Error checking executor existence: ${error}`);
     return false;
   }
 }
@@ -202,7 +197,7 @@ async function listDirectoryContents(
   directoryPath: string
 ): Promise<FileSystemItem[]> {
   try {
-    console.log(colors.gray(`Checking: ${directoryPath}`));
+    Logger.muted(`Checking: ${directoryPath}`);
 
     const commands = [
       `ls -1 ${escapeShellArg(directoryPath)} 2>/dev/null`,
@@ -220,27 +215,25 @@ async function listDirectoryContents(
           return parseDirectoryOutput(stdout, directoryPath, deviceId);
         }
       } catch (error) {
-        console.log(colors.yellow(`Command failed: ${command}`));
+        Logger.warning(`Command failed: ${command}`);
         continue;
       }
     }
 
-    console.log(
-      colors.yellow(`Attempting to create directory: ${directoryPath}`)
-    );
+    Logger.warning(`Attempting to create directory: ${directoryPath}`);
     try {
       await execAsync(
         `adb -s ${deviceId} shell "mkdir -p ${escapeShellArg(directoryPath)}"`
       );
-      console.log(colors.green(`Directory created successfully`));
+      Logger.success(`Directory created successfully`);
       return [];
     } catch (createError) {
-      console.log(colors.red(`Failed to create directory: ${createError}`));
+      Logger.error(`Failed to create directory: ${createError}`);
     }
 
     return [];
   } catch (error) {
-    console.log(colors.red(`Failed to access directory: ${error}`));
+    Logger.error(`Failed to access directory: ${error}`);
     return [];
   }
 }
@@ -309,41 +302,32 @@ function displayDirectoryContents(
   items: FileSystemItem[],
   currentPath: string
 ): void {
-  console.log();
-  console.log(colors.cyan(`Current Directory: ${colors.white(currentPath)}`));
+  Logger.currentDirectory(currentPath);
 
   if (items.length === 0) {
-    console.log(colors.yellow("Directory is empty (or newly created)"));
+    Logger.emptyDirectory();
     return;
   }
 
-  console.log();
   items.forEach((item, index) => {
     const icon = getFileIcon(item.name, item.isDirectory);
     const type = item.isDirectory
       ? colors.blue("[DIR]")
       : colors.green("[FILE]");
-    console.log(
-      `   ${colors.gray(
-        (index + 1).toString().padStart(2)
-      )}. ${icon} ${colors.white(item.name)} ${type}`
-    );
+    Logger.fileItem(index + 1, icon, item.name, type);
   });
 
-  console.log();
-  console.log(colors.gray(`Total: ${items.length} items`));
+  Logger.totalItems(items.length);
 }
 
 async function viewFileContent(
   deviceId: string,
   filePath: string
 ): Promise<void> {
-  console.log();
-  console.log(
-    colors.cyan(`Viewing: ${colors.white(path.posix.basename(filePath))}`)
-  );
-  console.log(colors.gray(`   Path: ${filePath}`));
-  console.log();
+  Logger.info(`Viewing: ${colors.white(path.posix.basename(filePath))}`, {
+    spaceBefore: true,
+  });
+  Logger.path("Path", filePath);
 
   try {
     const { stdout } = await execAsync(
@@ -351,17 +335,17 @@ async function viewFileContent(
     );
 
     if (stdout.trim()) {
-      console.log(colors.white("─".repeat(60)));
+      Logger.separator();
       console.log(stdout);
-      console.log(colors.white("─".repeat(60)));
+      Logger.separator();
     } else {
-      console.log(colors.yellow("File appears to be empty"));
+      Logger.warning("File appears to be empty");
     }
   } catch (error) {
-    console.log(colors.red(`Failed to read file: ${error}`));
+    Logger.error(`Failed to read file: ${error}`);
   }
 
-  console.log();
+  Logger.space();
   await text({
     message: "Press Enter to continue...",
     placeholder: "",
@@ -377,9 +361,10 @@ async function deleteFileOrDirectory(
   const itemName = path.posix.basename(itemPath);
   const itemType = isDirectory ? "directory" : "file";
 
-  console.log();
-  console.log(colors.yellow(`Delete ${itemType}: ${colors.white(itemName)}`));
-  console.log(colors.gray(`   Path: ${itemPath}`));
+  Logger.warning(`Delete ${itemType}: ${colors.white(itemName)}`, {
+    spaceBefore: true,
+  });
+  Logger.path("Path", itemPath);
 
   const deleteScope = await select({
     message: `Delete ${itemType} from:`,
@@ -393,7 +378,7 @@ async function deleteFileOrDirectory(
   });
 
   if (!deleteScope || typeof deleteScope === "symbol") {
-    console.log(colors.yellow("Delete cancelled"));
+    Logger.warning("Delete cancelled");
     return false;
   }
 
@@ -404,7 +389,7 @@ async function deleteFileOrDirectory(
   });
 
   if (!confirmed) {
-    console.log(colors.gray("Delete cancelled"));
+    Logger.muted("Delete cancelled");
     return false;
   }
 
@@ -416,11 +401,9 @@ async function deleteFileOrDirectory(
   let success = 0;
   let failed = 0;
 
-  console.log();
-  console.log(
-    colors.green(
-      `Deleting ${itemType} from ${targetDevices.length} device(s)...`
-    )
+  Logger.success(
+    `Deleting ${itemType} from ${targetDevices.length} device(s)...`,
+    { spaceBefore: true }
   );
 
   for (const device of targetDevices) {
@@ -451,18 +434,7 @@ async function deleteFileOrDirectory(
     }
   }
 
-  console.log();
-  if (failed === 0) {
-    console.log(
-      colors.green(`Successfully deleted from all ${success} device(s)!`)
-    );
-  } else {
-    console.log(
-      colors.yellow(
-        `Completed: ${success} successful, ${failed} failed/not found`
-      )
-    );
-  }
+  Logger.operationResult(success, failed, "deletion");
 
   return success > 0;
 }
@@ -472,8 +444,7 @@ async function copyFromLocalToCurrentPath(
   currentPath: string,
   allDevices: AdbDevice[]
 ): Promise<void> {
-  console.log();
-  console.log(colors.cyan("Copy from Local Machine"));
+  Logger.info("Copy from Local Machine", { spaceBefore: true });
 
   const localPath = await text({
     message: "Enter local file path:",
@@ -487,7 +458,7 @@ async function copyFromLocalToCurrentPath(
   });
 
   if (!localPath || typeof localPath === "symbol") {
-    console.log(colors.yellow("Copy cancelled"));
+    Logger.warning("Copy cancelled");
     return;
   }
 
@@ -495,8 +466,8 @@ async function copyFromLocalToCurrentPath(
   const fileName = path.basename(cleanPath);
   const targetPath = path.posix.join(currentPath, fileName);
 
-  console.log(colors.green(`Local: ${cleanPath}`));
-  console.log(colors.gray(`Target: ${targetPath}`));
+  Logger.success(`Local: ${cleanPath}`);
+  Logger.muted(`Target: ${targetPath}`);
 
   const copyScope = await select({
     message: "Copy to:",
@@ -510,7 +481,7 @@ async function copyFromLocalToCurrentPath(
   });
 
   if (!copyScope || typeof copyScope === "symbol") {
-    console.log(colors.yellow("Copy cancelled"));
+    Logger.warning("Copy cancelled");
     return;
   }
 
@@ -524,7 +495,7 @@ async function copyFromLocalToCurrentPath(
   });
 
   if (!confirmed) {
-    console.log(colors.yellow("Copy cancelled"));
+    Logger.warning("Copy cancelled");
     return;
   }
 
@@ -800,7 +771,7 @@ async function copyDirectoryContents(
           `rm -f "${localTemp}" 2>/dev/null || del /Q "${localTemp}" 2>nul`
         );
       } catch (error) {
-        console.log(colors.yellow(`Failed to copy ${item.name}: ${error}`));
+        Logger.warning(`Failed to copy ${item.name}: ${error}`);
       }
     }
   }
@@ -880,7 +851,7 @@ async function copyDirectoryRecursive(
           `rm -f "${localTemp}" 2>/dev/null || del /Q "${localTemp}" 2>nul`
         );
       } catch (error) {
-        console.log(colors.yellow(`Failed to copy ${item.name}: ${error}`));
+        Logger.warning(`Failed to copy ${item.name}: ${error}`);
       }
     }
   }
@@ -892,9 +863,8 @@ async function copyToDevices(
   targetDevices: AdbDevice[],
   isDirectory: boolean
 ): Promise<void> {
-  console.log();
-  console.log(colors.green("Starting copy operation..."));
-  console.log(colors.gray(`Source: ${sourcePath}`));
+  Logger.success("Starting copy operation...", { spaceBefore: true });
+  Logger.muted(`Source: ${sourcePath}`);
 
   let success = 0;
   let failed = 0;
@@ -947,17 +917,12 @@ async function copyToDevices(
       success++;
     } catch (error) {
       deviceSpinner.stop(colors.red(`${device.id}`));
-      console.log(colors.red(`   Error: ${error}`));
+      Logger.error(`Error: ${error}`, { indent: 1 });
       failed++;
     }
   }
 
-  console.log();
-  if (failed === 0) {
-    outro(colors.green(`Successfully copied to all ${success} device(s)!`));
-  } else {
-    outro(colors.yellow(`Completed: ${success} successful, ${failed} failed`));
-  }
+  Logger.operationResult(success, failed, "copy operation");
 }
 
 async function copyLocalToDevices(
@@ -965,8 +930,7 @@ async function copyLocalToDevices(
   targetDevices: AdbDevice[],
   targetPath: string
 ): Promise<void> {
-  console.log();
-  console.log(colors.green("Copying from local machine..."));
+  Logger.success("Copying from local machine...", { spaceBefore: true });
 
   let success = 0;
   let failed = 0;
@@ -986,26 +950,19 @@ async function copyLocalToDevices(
       success++;
     } catch (error) {
       deviceSpinner.stop(colors.red(`${device.id}`));
-      console.log(colors.red(`   Error: ${error}`));
+      Logger.error(`Error: ${error}`, { indent: 1 });
       failed++;
     }
   }
 
-  console.log();
-  if (failed === 0) {
-    outro(colors.green(`Successfully copied to all ${success} device(s)!`));
-  } else {
-    outro(colors.yellow(`Completed: ${success} successful, ${failed} failed`));
-  }
+  Logger.operationResult(success, failed, "copy operation");
 }
 
 export async function executorFileManagement(): Promise<void> {
-  console.log();
-  console.log(colors.cyan(colors.bold("Executor File Management")));
-  console.log(
-    colors.gray("   Complete file system management across all devices")
-  );
-  console.log();
+  Logger.title("Executor File Management");
+  Logger.muted("Complete file system management across all devices", {
+    indent: 1,
+  });
 
   while (true) {
     const executorChoice = await select({
@@ -1029,7 +986,7 @@ export async function executorFileManagement(): Promise<void> {
       return;
     }
 
-    console.log(colors.green(`Selected: ${executor.name}`));
+    Logger.success(`Selected: ${executor.name}`);
 
     const deviceSpinner = spinner();
     deviceSpinner.start(colors.gray("Scanning devices..."));
@@ -1045,8 +1002,9 @@ export async function executorFileManagement(): Promise<void> {
       return;
     }
 
-    console.log();
-    console.log(colors.cyan(`Checking for ${executor.name} on devices...`));
+    Logger.info(`Checking for ${executor.name} on devices...`, {
+      spaceBefore: true,
+    });
 
     const checkSpinner = spinner();
     checkSpinner.start(colors.gray("Checking executor folders..."));
@@ -1059,25 +1017,17 @@ export async function executorFileManagement(): Promise<void> {
     checkSpinner.stop();
 
     if (devicesWithExecutor.length === 0) {
-      console.log();
-      console.log(
-        colors.red(
-          `No devices found with ${executor.name} folder at ${executor.path}`
-        )
+      Logger.error(
+        `No devices found with ${executor.name} folder at ${executor.path}`,
+        { spaceBefore: true }
       );
-      console.log(colors.yellow("Devices checked:"));
+      Logger.warning("Devices checked:");
       readyDevices.forEach((device) => {
-        console.log(
-          colors.gray(
-            `   • ${device.id} ${device.model ? `(${device.model})` : ""} - Missing`
-          )
-        );
+        Logger.deviceMissing(device.id, device.model);
       });
-      console.log();
-      console.log(
-        colors.cyan(
-          "Tip: Make sure the executor is installed on at least one device"
-        )
+      Logger.info(
+        "Tip: Make sure the executor is installed on at least one device",
+        { spaceBefore: true }
       );
 
       const tryAgain = await confirm({
@@ -1092,18 +1042,12 @@ export async function executorFileManagement(): Promise<void> {
       continue;
     }
 
-    console.log();
-    console.log(
-      colors.green(
-        `Found ${executor.name} on ${devicesWithExecutor.length} device(s):`
-      )
+    Logger.success(
+      `Found ${executor.name} on ${devicesWithExecutor.length} device(s):`,
+      { spaceBefore: true }
     );
     devicesWithExecutor.forEach((device) => {
-      console.log(
-        colors.green(
-          `   • ${device.id} ${device.model ? `(${device.model})` : ""} - Found`
-        )
-      );
+      Logger.deviceFound(device.id, device.model);
     });
 
     const devicesWithoutExecutor = readyDevices.filter(
@@ -1112,14 +1056,11 @@ export async function executorFileManagement(): Promise<void> {
     );
 
     if (devicesWithoutExecutor.length > 0) {
-      console.log();
-      console.log(colors.yellow(`Devices without ${executor.name}:`));
+      Logger.warning(`Devices without ${executor.name}:`, {
+        spaceBefore: true,
+      });
       devicesWithoutExecutor.forEach((device) => {
-        console.log(
-          colors.yellow(
-            `   • ${device.id} ${device.model ? `(${device.model})` : ""} - Missing`
-          )
-        );
+        Logger.deviceMissing(device.id, device.model);
       });
     }
 
@@ -1150,11 +1091,9 @@ export async function executorFileManagement(): Promise<void> {
       return;
     }
 
-    console.log(colors.green(`Managing files on: ${sourceDevice.id}`));
-    console.log(
-      colors.gray(
-        `You can copy files to all ${readyDevices.length} connected devices from here`
-      )
+    Logger.success(`Managing files on: ${sourceDevice.id}`);
+    Logger.muted(
+      `You can copy files to all ${readyDevices.length} connected devices from here`
     );
 
     while (true) {
@@ -1165,17 +1104,15 @@ export async function executorFileManagement(): Promise<void> {
       );
 
       if (!selection) {
-        console.log(colors.yellow("Exiting file management"));
+        Logger.warning("Exiting file management");
         break;
       }
 
-      console.log(colors.green(`Selected: ${selection.path}`));
+      Logger.success(`Selected: ${selection.path}`);
 
       const targetCount = readyDevices.length - 1;
       if (targetCount === 0) {
-        console.log(
-          colors.yellow("Only one device connected - nothing to copy to")
-        );
+        Logger.warning("Only one device connected - nothing to copy to");
         continue;
       }
 
@@ -1186,9 +1123,7 @@ export async function executorFileManagement(): Promise<void> {
       });
 
       if (!shouldProceed) {
-        console.log(
-          colors.yellow("Copy cancelled, returning to file management")
-        );
+        Logger.warning("Copy cancelled, returning to file management");
         continue;
       }
 

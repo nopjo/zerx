@@ -3,6 +3,7 @@ import colors from "picocolors";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { getConnectedDevices } from "@/utils/adb";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -186,12 +187,10 @@ async function getDeviceResourceSummary(
 }
 
 function displayResourceSummary(summaries: DeviceResourceSummary[]): void {
-  console.log();
-  console.log(colors.cyan("[#] " + colors.bold("System Resource Monitor")));
-  console.log();
+  Logger.title("[#] System Resource Monitor");
 
   if (summaries.length === 0) {
-    console.log(colors.yellow("[-] No devices found"));
+    Logger.warning("[-] No devices found");
     return;
   }
 
@@ -218,28 +217,31 @@ function displayResourceSummary(summaries: DeviceResourceSummary[]): void {
         ? Math.round((usedRam / summary.totalRamMB) * 100)
         : 0;
 
-    console.log(colors.cyan(`[-] ${deviceName}`));
-    console.log(colors.white(`   System Resources:`));
-    console.log(
-      `     RAM: ${colors.yellow(`${usedRam}MB`)} / ${
+    Logger.info(`[-] ${deviceName}`);
+    Logger.normal(`System Resources:`, { indent: 1 });
+    Logger.muted(
+      `RAM: ${colors.yellow(`${usedRam}MB`)} / ${
         summary.totalRamMB
-      }MB (${colors.yellow(`${ramUsagePercent}%`)})`
+      }MB (${colors.yellow(`${ramUsagePercent}%`)})`,
+      { indent: 2 }
     );
-    console.log(
-      `     CPU: ${colors.yellow(
-        `${summary.totalCpuPercent}%`
-      )} total system usage${
+    Logger.muted(
+      `CPU: ${colors.yellow(`${summary.totalCpuPercent}%`)} total system usage${
         summary.cpuCores > 0 ? ` (${summary.cpuCores} cores)` : ""
-      }`
+      }`,
+      { indent: 2 }
     );
-    console.log();
 
     if (summary.robloxInstances.length === 0) {
-      console.log(colors.gray(`   No Roblox instances running`));
+      Logger.muted(`No Roblox instances running`, {
+        indent: 1,
+        spaceBefore: true,
+      });
     } else {
-      console.log(
-        colors.white(`   Roblox Instances (${summary.robloxInstances.length}):`)
-      );
+      Logger.normal(`Roblox Instances (${summary.robloxInstances.length}):`, {
+        indent: 1,
+        spaceBefore: true,
+      });
 
       summary.robloxInstances.forEach((instance) => {
         const appName =
@@ -262,55 +264,56 @@ function displayResourceSummary(summaries: DeviceResourceSummary[]): void {
 
         const statusIcon = instance.isRunning ? "[+]" : "[X]";
 
-        console.log(`     ${statusIcon} ${colors.white(appName)}`);
-        console.log(
-          `       RAM: ${ramColor(
+        Logger.muted(`${statusIcon} ${colors.white(appName)}`, { indent: 2 });
+        Logger.muted(
+          `RAM: ${ramColor(
             `${instance.ramUsageMB}MB`
           )} | CPU: ${cpuColor(`${instance.cpuPercent}%`)} | PID: ${
             instance.pid
-          }`
+          }`,
+          { indent: 3 }
         );
       });
     }
 
     if (summary.robloxInstances.length > 0) {
-      console.log();
-      console.log(colors.white(`   Roblox Totals:`));
-      console.log(
-        `     RAM: ${colors.cyan(`${robloxRam}MB`)} | CPU: ${colors.cyan(
+      Logger.normal(`Roblox Totals:`, { indent: 1, spaceBefore: true });
+      Logger.muted(
+        `RAM: ${colors.cyan(`${robloxRam}MB`)} | CPU: ${colors.cyan(
           `${Math.round(robloxCpu * 10) / 10}%`
-        )}`
+        )}`,
+        { indent: 2 }
       );
     }
 
-    console.log();
+    Logger.space();
     totalInstances += summary.robloxInstances.length;
     totalRamUsage += robloxRam;
     totalCpuUsage += robloxCpu;
   }
 
-  console.log(colors.cyan(colors.bold("Overall Summary:")));
-  console.log(
-    `   Total Roblox Instances: ${colors.bold(totalInstances.toString())}`
+  Logger.title("Overall Summary:");
+  Logger.muted(
+    `Total Roblox Instances: ${colors.bold(totalInstances.toString())}`,
+    { indent: 1 }
   );
-  console.log(
-    `   Total Roblox RAM Usage: ${colors.bold(`${totalRamUsage}MB`)}`
-  );
-  console.log(
-    `   Total Roblox CPU Usage: ${colors.bold(
+  Logger.muted(`Total Roblox RAM Usage: ${colors.bold(`${totalRamUsage}MB`)}`, {
+    indent: 1,
+  });
+  Logger.muted(
+    `Total Roblox CPU Usage: ${colors.bold(
       `${Math.round(totalCpuUsage * 10) / 10}%`
-    )}`
+    )}`,
+    { indent: 1 }
   );
-  console.log();
+  Logger.space();
 }
 
 export async function systemResourceMonitor(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[#] " + colors.bold("System Resource Monitor")));
-  console.log(
-    colors.gray("   Monitor RAM and CPU usage for all Roblox instances")
-  );
-  console.log();
+  Logger.title("[#] System Resource Monitor");
+  Logger.muted("Monitor RAM and CPU usage for all Roblox instances", {
+    indent: 1,
+  });
 
   const deviceSpinner = spinner();
   deviceSpinner.start(colors.gray("Scanning for connected devices..."));
@@ -376,27 +379,23 @@ export async function systemResourceMonitor(): Promise<void> {
   if (monitorMode === "once") {
     await scanResources();
   } else {
-    console.log(colors.green("[~] Starting continuous monitoring..."));
-    console.log(
-      colors.gray("   Updates every 10 seconds - Press Ctrl+C to stop")
-    );
-    console.log();
+    Logger.success("[~] Starting continuous monitoring...");
+    Logger.muted("Updates every 10 seconds - Press Ctrl+C to stop", {
+      indent: 1,
+    });
+    Logger.space();
 
     try {
       while (true) {
         await scanResources();
-        console.log(
-          colors.gray(`[~] Next update in 10 seconds... (Press Ctrl+C to stop)`)
-        );
-        console.log();
+        Logger.muted("[~] Next update in 10 seconds... (Press Ctrl+C to stop)");
+        Logger.space();
         await new Promise((resolve) => setTimeout(resolve, 10000));
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes("SIGINT")) {
-        console.log();
         outro(colors.yellow("[!] Continuous monitoring stopped"));
       } else {
-        console.log();
         outro(colors.red(`[X] Monitoring error: ${error}`));
       }
     }

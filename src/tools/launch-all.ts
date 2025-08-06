@@ -8,6 +8,7 @@ import {
   printInstancesList,
   type LDPlayerInstance,
 } from "@/utils/ld";
+import { Logger } from "@/utils/logger";
 
 interface LaunchResult {
   instance: LDPlayerInstance;
@@ -20,9 +21,9 @@ async function launchSingleInstance(
   instance: LDPlayerInstance
 ): Promise<LaunchResult> {
   try {
-    console.log(
-      colors.gray(`   [^] Launching: ${colors.white(instance.name)}...`)
-    );
+    Logger.muted(`[^] Launching: ${colors.white(instance.name)}...`, {
+      indent: 1,
+    });
 
     await launchInstance(ldPath, instance.index);
 
@@ -31,40 +32,33 @@ async function launchSingleInstance(
     const isRunning = await isInstanceRunning(ldPath, instance.index);
 
     if (isRunning) {
-      console.log(
-        colors.green(
-          `   [+] ${colors.white(instance.name)} launched successfully`
-        )
+      Logger.success(
+        `[+] ${colors.white(instance.name)} launched successfully`,
+        { indent: 1 }
       );
       return { instance, success: true };
     } else {
-      console.log(
-        colors.yellow(
-          `   [!] ${colors.white(instance.name)} launch status unclear`
-        )
+      Logger.warning(
+        `[!] ${colors.white(instance.name)} launch status unclear`,
+        { indent: 1 }
       );
       return { instance, success: true };
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
-    console.log(
-      colors.red(
-        `   [X] ${colors.white(instance.name)} failed to launch: ${errorMsg}`
-      )
+    Logger.error(
+      `[X] ${colors.white(instance.name)} failed to launch: ${errorMsg}`,
+      { indent: 1 }
     );
     return { instance, success: false, error: errorMsg };
   }
 }
 
 export async function launchAllEmulators(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[^] " + colors.bold("Launch All Emulators")));
-  console.log(colors.gray("   Boot up all stopped LDPlayer instances"));
-  console.log();
+  Logger.title("[^] Launch All Emulators");
+  Logger.muted("Boot up all stopped LDPlayer instances", { indent: 1 });
 
-  console.log(
-    colors.gray("[>] Please specify your LDPlayer installation path...")
-  );
+  Logger.muted("[>] Please specify your LDPlayer installation path...");
   const ldPath = await getLDPlayerPath();
 
   if (!ldPath) {
@@ -72,7 +66,7 @@ export async function launchAllEmulators(): Promise<void> {
     return;
   }
 
-  console.log(colors.green(`[+] Using LDPlayer at: ${ldPath}`));
+  Logger.success(`[+] Using LDPlayer at: ${ldPath}`);
 
   const loadingSpinner = spinner();
   loadingSpinner.start(colors.gray("Loading LDPlayer instances..."));
@@ -111,8 +105,7 @@ export async function launchAllEmulators(): Promise<void> {
   );
 
   if (stoppedInstances.length === 0) {
-    console.log();
-    console.log(colors.green("All instances are already running!"));
+    Logger.success("All instances are already running!", { spaceBefore: true });
     outro(
       colors.cyan(
         `[*] ${runningInstances.length}/${instances.length} instances running`
@@ -121,20 +114,16 @@ export async function launchAllEmulators(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(
-    colors.yellow(
-      `[!] Found ${colors.bold(
-        stoppedInstances.length.toString()
-      )} stopped instance(s)`
-    )
+  Logger.warning(
+    `[!] Found ${colors.bold(
+      stoppedInstances.length.toString()
+    )} stopped instance(s)`,
+    { spaceBefore: true }
   );
-  console.log(
-    colors.green(
-      `[+] Found ${colors.bold(
-        runningInstances.length.toString()
-      )} running instance(s)`
-    )
+  Logger.success(
+    `[+] Found ${colors.bold(
+      runningInstances.length.toString()
+    )} running instance(s)`
   );
 
   const delayBetweenLaunches = await text({
@@ -168,9 +157,10 @@ export async function launchAllEmulators(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting sequential launch operation..."));
-  console.log();
+  Logger.success("[^] Starting sequential launch operation...", {
+    spaceBefore: true,
+    spaceAfter: true,
+  });
 
   const results: LaunchResult[] = [];
 
@@ -178,51 +168,43 @@ export async function launchAllEmulators(): Promise<void> {
     const instance = stoppedInstances[i];
 
     if (!instance) {
-      console.log(colors.red(`   [X] Invalid instance at index ${i}`));
+      Logger.error(`[X] Invalid instance at index ${i}`, { indent: 1 });
       continue;
     }
 
-    console.log(
-      colors.cyan(`[#] Progress: ${i + 1}/${stoppedInstances.length}`)
-    );
+    Logger.info(`[#] Progress: ${i + 1}/${stoppedInstances.length}`);
 
     const result = await launchSingleInstance(ldPath, instance);
     results.push(result);
 
     if (i < stoppedInstances.length - 1 && delayMs > 0) {
-      console.log(
-        colors.gray(
-          `   [~] Waiting ${delayBetweenLaunches}s before next launch...`
-        )
+      Logger.muted(
+        `[~] Waiting ${delayBetweenLaunches}s before next launch...`,
+        { indent: 1 }
       );
       await new Promise((resolve) => setTimeout(resolve, delayMs));
-      console.log();
+      Logger.space();
     }
   }
 
-  console.log();
-  console.log(colors.cyan("[^] " + colors.bold("Launch Results:")));
-  console.log();
+  Logger.title("[^] Launch Results:");
 
   const successfulLaunches = results.filter((result) => result.success);
   const failedLaunches = results.filter((result) => !result.success);
 
   if (successfulLaunches.length > 0) {
-    console.log(colors.green("[+] Successfully launched:"));
+    Logger.success("[+] Successfully launched:");
     for (const result of successfulLaunches) {
-      console.log(colors.green(`   • ${result.instance.name}`));
+      Logger.success(`• ${result.instance.name}`, { indent: 1 });
     }
   }
 
   if (failedLaunches.length > 0) {
-    console.log();
-    console.log(colors.red("[X] Failed to launch:"));
+    Logger.error("[X] Failed to launch:", { spaceBefore: true });
     for (const result of failedLaunches) {
-      console.log(colors.red(`   • ${result.instance.name}: ${result.error}`));
+      Logger.error(`• ${result.instance.name}: ${result.error}`, { indent: 1 });
     }
   }
-
-  console.log();
 
   if (failedLaunches.length === 0) {
     outro(

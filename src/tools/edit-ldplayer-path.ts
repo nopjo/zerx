@@ -3,29 +3,26 @@ import colors from "picocolors";
 import { existsSync } from "fs";
 import path from "path";
 import { getConfigValue, updateConfig, configExists } from "@/utils/config";
+import { Logger } from "@/utils/logger";
 
 export async function editLDPlayerPath(): Promise<void> {
-  console.log();
-  console.log(colors.cyan("[>] " + colors.bold("Edit LDPlayer Path")));
-  console.log(colors.gray("   Update your saved LDPlayer installation path"));
-  console.log();
+  Logger.title("[>] Edit LDPlayer Path");
+  Logger.muted("Update your saved LDPlayer installation path", { indent: 1 });
 
   const currentPath = getConfigValue("ldPlayerPath");
 
   if (currentPath) {
-    console.log(colors.green("[@] Current saved path:"));
-    console.log(colors.gray(`   ${currentPath}`));
+    Logger.success("[@] Current saved path:");
+    Logger.muted(currentPath, { indent: 1 });
 
     if (existsSync(currentPath)) {
-      console.log(colors.green("   [+] Path is valid"));
+      Logger.success("[+] Path is valid", { indent: 1 });
     } else {
-      console.log(colors.red("   [X] Path no longer exists"));
+      Logger.error("[X] Path no longer exists", { indent: 1 });
     }
   } else {
-    console.log(colors.yellow("[@] No LDPlayer path currently saved"));
+    Logger.warning("[@] No LDPlayer path currently saved");
   }
-
-  console.log();
 
   const actionChoice = await select({
     message: "What would you like to do?",
@@ -64,16 +61,15 @@ export async function editLDPlayerPath(): Promise<void> {
       return;
     }
 
-    console.log();
-    console.log(colors.cyan("[#] Testing current path..."));
+    Logger.info("[#] Testing current path...", { spaceBefore: true });
 
     if (existsSync(currentPath)) {
-      console.log(colors.green("[+] Path exists and is accessible"));
-      console.log(colors.gray(`   ${currentPath}`));
+      Logger.success("[+] Path exists and is accessible");
+      Logger.muted(currentPath, { indent: 1 });
       outro(colors.green("Path test successful!"));
     } else {
-      console.log(colors.red("[X] Path does not exist or is not accessible"));
-      console.log(colors.gray(`   ${currentPath}`));
+      Logger.error("[X] Path does not exist or is not accessible");
+      Logger.muted(currentPath, { indent: 1 });
       outro(colors.red("[!] Path test failed - consider updating your path"));
     }
     return;
@@ -100,12 +96,10 @@ export async function editLDPlayerPath(): Promise<void> {
   }
 
   if (actionChoice === "update") {
-    console.log();
-    console.log(colors.cyan("[~] Enter new LDPlayer path"));
-    console.log(
-      colors.gray("   Please provide the full path to your LDPlayer directory")
-    );
-    console.log();
+    Logger.info("[~] Enter new LDPlayer path", { spaceBefore: true });
+    Logger.muted("Please provide the full path to your LDPlayer directory", {
+      indent: 1,
+    });
 
     const newPath = await text({
       message: "Enter the full path to your LDPlayer directory:",
@@ -129,13 +123,11 @@ export async function editLDPlayerPath(): Promise<void> {
 
     const fullConsolePath = path.join(newPath, "ldconsole.exe");
 
-    console.log();
-    console.log(colors.cyan("[#] Path Update Summary:"));
+    Logger.info("[#] Path Update Summary:", { spaceBefore: true });
     if (currentPath) {
-      console.log(colors.gray("   Old path: ") + colors.red(currentPath));
+      Logger.muted("Old path: " + colors.red(currentPath), { indent: 1 });
     }
-    console.log(colors.gray("   New path: ") + colors.green(fullConsolePath));
-    console.log();
+    Logger.muted("New path: " + colors.green(fullConsolePath), { indent: 1 });
 
     const confirmUpdate = await confirm({
       message: "Save this new path?",
@@ -148,8 +140,9 @@ export async function editLDPlayerPath(): Promise<void> {
 
     updateConfig("ldPlayerPath", fullConsolePath);
 
-    console.log();
-    console.log(colors.green("[+] LDPlayer path updated successfully!"));
-    console.log(colors.gray(`   New path: ${fullConsolePath}`));
+    Logger.success("[+] LDPlayer path updated successfully!", {
+      spaceBefore: true,
+    });
+    Logger.muted(`New path: ${fullConsolePath}`, { indent: 1 });
   }
 }

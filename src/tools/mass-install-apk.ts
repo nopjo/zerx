@@ -4,6 +4,7 @@ import { existsSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { getConnectedDevices, printConnectedDevices } from "@/utils/adb";
+import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);
 
@@ -40,15 +41,8 @@ async function installApkToDevice(
 }
 
 export async function massInstallApk(): Promise<void> {
-  console.log();
-  console.log(
-    colors.cyan(
-      "[-] " +
-        colors.bold("Mass APK Installer (helpful for when updating Roblox)")
-    )
-  );
-  console.log(colors.gray("   Install an APK across devices"));
-  console.log();
+  Logger.title("[-] Mass APK Installer (helpful for when updating Roblox)");
+  Logger.muted("Install an APK across devices", { indent: 1 });
 
   const apkPath = await text({
     message: "Enter the APK file path:",
@@ -105,11 +99,9 @@ export async function massInstallApk(): Promise<void> {
     return;
   }
 
-  console.log();
-  console.log(colors.green("[^] Starting installation..."));
-  console.log(colors.gray(`   APK: ${cleanApkPath}`));
-  console.log(colors.gray(`   Devices: ${readyDevices.length}`));
-  console.log();
+  Logger.success("[^] Starting installation...", { spaceBefore: true });
+  Logger.muted(`APK: ${cleanApkPath}`, { indent: 1 });
+  Logger.muted(`Devices: ${readyDevices.length}`, { indent: 1 });
 
   const installSpinner = spinner();
   installSpinner.start(colors.gray("Installing APK to devices..."));
@@ -122,9 +114,7 @@ export async function massInstallApk(): Promise<void> {
 
   installSpinner.stop();
 
-  console.log();
-  console.log(colors.cyan("[#] " + colors.bold("Installation Results:")));
-  console.log();
+  Logger.title("[#] Installation Results:");
 
   const successfulInstalls = results.filter((result) => result.success);
 
@@ -135,18 +125,16 @@ export async function massInstallApk(): Promise<void> {
       : device?.id || result.deviceId;
 
     if (result.success) {
-      console.log(
-        colors.green(`   [+] ${deviceName} - Installation successful`)
-      );
+      Logger.success(`[+] ${deviceName} - Installation successful`, {
+        indent: 1,
+      });
     } else {
-      console.log(colors.red(`   [X] ${deviceName} - Installation failed`));
+      Logger.error(`[X] ${deviceName} - Installation failed`, { indent: 1 });
       if (result.error) {
-        console.log(colors.gray(`      Error: ${result.error}`));
+        Logger.muted(`Error: ${result.error}`, { indent: 2 });
       }
     }
   });
-
-  console.log();
 
   if (successfulInstalls.length === readyDevices.length) {
     outro(
