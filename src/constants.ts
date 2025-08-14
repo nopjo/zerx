@@ -1,0 +1,17 @@
+export const TOOL_ORDER: string[] = [
+  "roblox-launcher",
+  "automatic-login",
+  "launch-emulators",
+  "file-management",
+  "resource-monitor",
+  "cookie-extractor",
+  "cookie-checker",
+  "close-roblox",
+  "close-emulators",
+  "arrange-windows",
+  "optimize-devices",
+  "mass-install-apk",
+  "clone-vm",
+  "delete-roblox-config",
+  "delete-backups",
+];
