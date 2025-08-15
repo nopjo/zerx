@@ -16,10 +16,15 @@ export async function listDirectoryContents(
   try {
     Logger.muted(`Checking: ${directoryPath}`);
 
+    const escapedPath = directoryPath.replace(/'/g, "'\"'\"'");
+
     const commands = [
       `ls -la "${directoryPath}"`,
       `ls "${directoryPath}"`,
       `ls -1 "${directoryPath}"`,
+      `ls -la '${escapedPath}'`,
+      `ls '${escapedPath}'`,
+      `ls -1 '${escapedPath}'`,
     ];
 
     for (const command of commands) {
@@ -40,15 +45,7 @@ export async function listDirectoryContents(
       }
     }
 
-    Logger.warning(`Attempting to create directory: ${directoryPath}`);
-    try {
-      await createDirectoryOnDevice(deviceId, directoryPath);
-      Logger.success(`Directory created successfully`);
-      return [];
-    } catch (createError) {
-      Logger.error(`Failed to create directory: ${createError}`);
-    }
-
+    Logger.warning(`Directory not found: ${directoryPath}`);
     return [];
   } catch (error) {
     Logger.error(`Failed to access directory: ${error}`);
@@ -103,12 +100,20 @@ export async function parseDirectoryOutput(
       const itemPath = path.posix.join(directoryPath, name);
 
       try {
+        const escapedPath = itemPath.replace(/'/g, "'\"'\"'");
         const { stdout: testOutput } = await execAsync(
-          `adb -s ${deviceId} shell "test -d '${itemPath}' && echo 'DIR' || echo 'FILE'"`
+          `adb -s ${deviceId} shell "test -d '${escapedPath}' && echo 'DIR' || echo 'FILE'"`
         );
         isDirectory = testOutput.trim() === "DIR";
       } catch {
-        isDirectory = false;
+        try {
+          const { stdout: testOutput } = await execAsync(
+            `adb -s ${deviceId} shell "test -d \"${itemPath}\" && echo 'DIR' || echo 'FILE'"`
+          );
+          isDirectory = testOutput.trim() === "DIR";
+        } catch {
+          isDirectory = false;
+        }
       }
     }
 
@@ -132,10 +137,15 @@ export async function verifyDirectoryExists(
   deviceId: string,
   dirPath: string
 ): Promise<boolean> {
+  const escapedPath = dirPath.replace(/'/g, "'\"'\"'");
+
   const methods = [
     `test -d "${dirPath}" && echo 'EXISTS'`,
     `ls -d "${dirPath}" 2>/dev/null && echo 'EXISTS'`,
     `cd "${dirPath}" 2>/dev/null && echo 'EXISTS'`,
+    `test -d '${escapedPath}' && echo 'EXISTS'`,
+    `ls -d '${escapedPath}' 2>/dev/null && echo 'EXISTS'`,
+    `cd '${escapedPath}' 2>/dev/null && echo 'EXISTS'`,
   ];
 
   for (const method of methods) {
@@ -163,7 +173,13 @@ export async function createDirectoryOnDevice(
     return;
   }
 
-  const commands = [`mkdir -p "${dirPath}"`, `mkdir -p '${dirPath}'`];
+  const escapedPath = dirPath.replace(/'/g, "'\"'\"'");
+
+  const commands = [
+    `mkdir -p "${dirPath}"`,
+    `mkdir -p '${escapedPath}'`,
+    `mkdir -p '${dirPath}'`,
+  ];
 
   for (const command of commands) {
     try {
@@ -189,7 +205,10 @@ export async function createDirectoryOnDevice(
     }
 
     try {
-      await execAsync(`adb -s ${deviceId} shell "mkdir '${currentPath}'"`);
+      const escapedCurrentPath = currentPath.replace(/'/g, "'\"'\"'");
+      await execAsync(
+        `adb -s ${deviceId} shell "mkdir '${escapedCurrentPath}'"`
+      );
     } catch (error) {}
   }
 }
