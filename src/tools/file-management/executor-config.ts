@@ -7,11 +7,6 @@ export const EXECUTORS: ExecutorInfo[] = [
     description: "Delta (https://deltaexploits.gg)",
   },
   {
-    name: "Krnl",
-    path: "/storage/emulated/0/krnl",
-    description: "Krnl (https://krnl.cat/)",
-  },
-  {
     name: "CodeX",
     path: "/storage/emulated/0/Codex",
     description: "CodeX (https://codex.lol/)",
@@ -19,12 +14,22 @@ export const EXECUTORS: ExecutorInfo[] = [
   {
     name: "Cryptic",
     path: "/storage/emulated/0/Cryptic",
-    description: "CodeX (https://getcryptic.net/)",
+    description: "Cryptic (https://getcryptic.net/)",
   },
   {
     name: "VegaX",
     path: "/storage/emulated/0/VegaX",
     description: "VegaX (https://vegax.gg/)",
+  },
+  {
+    name: "Ronix",
+    path: "/storage/emulated/0/RonixExploit",
+    description: "Ronix (https://ronixstudios.com/)",
+  },
+  {
+    name: "Krnl",
+    path: "/storage/emulated/0/krnl",
+    description: "Krnl (https://krnl.cat/)",
   },
 ];
 

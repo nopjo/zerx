@@ -2,6 +2,7 @@ export const TOOL_ORDER: string[] = [
   "roblox-launcher",
   "automatic-login",
   "launch-emulators",
+  "quick-swap-executor-keys",
   "file-management",
   "resource-monitor",
   "cookie-extractor",

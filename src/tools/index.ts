@@ -18,6 +18,7 @@ import "./optimize-devices";
 import "./roblox-launcher";
 import "./delete-roblox-config";
 import "./resource-monitor";
+import "./quick-swap-executor-keys";
 
 export async function runTool(): Promise<void> {
   while (true) {
