@@ -27,12 +27,9 @@ export async function detectRobloxInstances(
 
     return instances;
   } catch (error) {
-    Logger.muted(
-      `[!] Could not detect Roblox instances on ${deviceId}: ${error}`,
-      { indent: 1 }
-    );
+    Logger.muted(`[!] No Roblox instances found on ${deviceId}`, { indent: 1 });
 
-    return [{ packageName: "com.roblox.client", deviceId }];
+    return [];
   }
 }
 
