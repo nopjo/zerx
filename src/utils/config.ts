@@ -41,6 +41,7 @@ export interface Config {
   emulatorType?: "ldplayer" | "mumu";
   inputMethod?: "arrows" | "numbers";
   robloxLauncher?: RobloxLauncherConfig;
+  recentCookieFiles?: string[];
 }
 
 const CONFIG_FILE = "config.json";
