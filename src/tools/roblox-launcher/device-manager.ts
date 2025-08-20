@@ -172,16 +172,27 @@ export async function getDeviceStatuses(): Promise<DeviceStatus[]> {
   const statuses: DeviceStatus[] = [];
   let configChanged = false;
 
+  const responsiveChecks = await Promise.all(
+    readyDevices.map(async (device) => ({
+      deviceId: device.id,
+      isResponsive: await isDeviceResponsive(
+        device.id,
+        launcherConfig.deviceTimeoutSeconds
+      ),
+    }))
+  );
+
+  const responsiveMap = new Map(
+    responsiveChecks.map((check) => [check.deviceId, check.isResponsive])
+  );
+
   for (const device of readyDevices) {
-    const isResponsive = await isDeviceResponsive(
-      device.id,
-      launcherConfig.deviceTimeoutSeconds
-    );
+    const isResponsive = responsiveMap.get(device.id) || false;
     const instances = deviceInstanceMap.get(device.id) || [];
     const instanceStatuses: InstanceStatus[] = [];
 
     if (isResponsive) {
-      for (const instance of instances) {
+      const cookieCheckTasks = instances.map(async (instance) => {
         let cacheEntry = launcherConfig.instanceCache.find(
           (entry) =>
             entry.deviceId === device.id &&
@@ -199,9 +210,7 @@ export async function getDeviceStatuses(): Promise<DeviceStatus[]> {
         if (shouldCheckCookie) {
           Logger.muted(
             `[@] Checking cookies for ${instance.packageName} on ${device.id}...`,
-            {
-              indent: 1,
-            }
+            { indent: 1 }
           );
           const instanceUsername = await getUsernameFromInstance(
             device.id,
@@ -222,10 +231,10 @@ export async function getDeviceStatuses(): Promise<DeviceStatus[]> {
               };
               launcherConfig.instanceCache.push(cacheEntry);
             }
-            configChanged = true;
+            return { instance, username, cacheUpdated: true };
           } else if (cacheEntry) {
             cacheEntry.lastCookieCheck = now;
-            configChanged = true;
+            return { instance, username, cacheUpdated: true };
           }
         } else if (cacheEntry && cacheEntry.lastCookieCheck) {
           const cacheAgeMinutes = Math.floor(
@@ -237,23 +246,37 @@ export async function getDeviceStatuses(): Promise<DeviceStatus[]> {
           );
         }
 
+        return { instance, username, cacheUpdated: false };
+      });
+
+      const cookieResults = await Promise.all(cookieCheckTasks);
+
+      if (cookieResults.some((result) => result.cacheUpdated)) {
+        configChanged = true;
+      }
+
+      const robloxRunningTasks = cookieResults.map(async (result) => {
+        const { instance, username } = result;
         const assignedGame = username
           ? getGameForUsername(username)
           : undefined;
 
-        const instanceStatus: InstanceStatus = {
+        const robloxRunning = await isRobloxRunning(
+          device.id,
+          instance.packageName
+        );
+
+        return {
           packageName: instance.packageName,
           deviceId: device.id,
-          isRobloxRunning: await isRobloxRunning(
-            device.id,
-            instance.packageName
-          ),
+          isRobloxRunning: robloxRunning,
           username: username || undefined,
           assignedGame,
         };
+      });
 
-        instanceStatuses.push(instanceStatus);
-      }
+      const instanceStatusResults = await Promise.all(robloxRunningTasks);
+      instanceStatuses.push(...instanceStatusResults);
     } else {
       for (const instance of instances) {
         const cacheEntry = launcherConfig.instanceCache.find(

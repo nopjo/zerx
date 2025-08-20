@@ -2,6 +2,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import {
   checkRobloxPresenceById,
+  checkRobloxPresenceWithCookie,
   searchRobloxUserByUsername,
   validateRobloxCookie,
 } from "@/utils/roblox";
@@ -31,6 +32,26 @@ export async function checkRobloxPresence(
         if (cookie && cookie.length > 0) {
           const validation = await validateRobloxCookie(cookie);
           if (validation.isValid && validation.userInfo?.userId) {
+            const presenceInfo = await checkRobloxPresenceWithCookie(
+              validation.userInfo.userId,
+              cookie
+            );
+
+            if (presenceInfo) {
+              Logger.muted(
+                `[*] ${username} presence: ${presenceInfo.isInGame ? "In Game" : presenceInfo.isOnline ? "Online" : "Offline"}${
+                  presenceInfo.isInGame && presenceInfo.lastLocation
+                    ? ` (${presenceInfo.lastLocation})`
+                    : ""
+                }`,
+                { indent: 2 }
+              );
+              return presenceInfo.isInGame;
+            }
+
+            Logger.muted("[!] Enhanced presence check failed, using fallback", {
+              indent: 2,
+            });
             return await checkRobloxPresenceById(validation.userInfo.userId);
           }
         }

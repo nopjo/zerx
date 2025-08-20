@@ -1,5 +1,7 @@
 import { text, confirm } from "@clack/prompts";
 import colors from "picocolors";
+import { exec } from "child_process";
+import { promisify } from "util";
 import { Logger } from "@/utils/logger";
 import { rebootAllEmulatorInstances } from "@/utils/emu/abstraction";
 import type { EmulatorType } from "@/types/tool";
@@ -7,6 +9,26 @@ import { getRobloxLauncherConfig, saveRobloxLauncherConfig } from "./config";
 import { getDeviceStatuses, rebootDevice } from "./device-manager";
 import { checkPresenceForInstances } from "./presence";
 import { launchRobloxGame } from "./game-launcher";
+
+const execAsync = promisify(exec);
+
+async function closeRobloxInstance(
+  deviceId: string,
+  packageName: string,
+  username?: string
+): Promise<boolean> {
+  try {
+    await execAsync(`adb -s ${deviceId} shell "am force-stop ${packageName}"`);
+    try {
+      await execAsync(`adb -s ${deviceId} shell "pkill -f ${packageName}"`);
+    } catch {}
+    Logger.warning(`[!] Closed @${username} (not in-game)`, { indent: 2 });
+    return true;
+  } catch (error) {
+    Logger.error(`[X] Failed to close @${username}: ${error}`, { indent: 2 });
+    return false;
+  }
+}
 
 export async function keepAliveMode(
   emulatorType: EmulatorType = "ldplayer"
@@ -81,6 +103,9 @@ export async function keepAliveMode(
       `Presence checking every ${launcherConfig.presenceCheckInterval} minutes`,
       { indent: 1 }
     );
+    Logger.muted("Will auto-close processes that fail presence checks", {
+      indent: 1,
+    });
   }
   Logger.muted("Press Ctrl+C to stop", { indent: 1 });
   Logger.space();
@@ -157,6 +182,22 @@ export async function keepAliveMode(
         updatedInstancesWithGames =
           await checkPresenceForInstances(instancesWithGames);
         lastPresenceCheck = now;
+
+        for (const instance of updatedInstancesWithGames) {
+          if (
+            instance.isRobloxRunning &&
+            instance.isInGame === false &&
+            instance.username
+          ) {
+            await closeRobloxInstance(
+              instance.deviceId,
+              instance.packageName,
+              instance.username
+            );
+
+            instance.isRobloxRunning = false;
+          }
+        }
       }
 
       const timestamp = new Date().toLocaleTimeString();
@@ -188,15 +229,11 @@ export async function keepAliveMode(
             ? "client"
             : instance.packageName.replace("com.roblox.", "");
 
-        const shouldRelaunch =
-          !instance.isRobloxRunning ||
-          (enablePresenceCheck && instance.isInGame === false);
+        const shouldRelaunch = !instance.isRobloxRunning;
 
         if (shouldRelaunch && instance.assignedGame) {
-          const reason = !instance.isRobloxRunning ? "stopped" : "not in game";
-
           Logger.error(
-            `[X] ${deviceName} - ${appName} (@${instance.username}) ${reason}, relaunching...`,
+            `[X] ${deviceName} - ${appName} (@${instance.username}) stopped, relaunching...`,
             { indent: 1 }
           );
           const success = await launchRobloxGame(

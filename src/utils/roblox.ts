@@ -24,6 +24,18 @@ interface RobloxPresenceResponse {
   }>;
 }
 
+export interface AuthenticatedPresenceInfo {
+  isOnline: boolean;
+  isInGame: boolean;
+  lastLocation: string;
+  placeId?: number;
+  rootPlaceId?: number;
+  gameId?: string;
+  universeId?: number;
+  lastOnline: string;
+  userPresenceType: number;
+}
+
 interface RobloxUserSearchResponse {
   data: Array<{
     id: number;
@@ -139,6 +151,64 @@ export async function searchRobloxUserByUsername(
         }`
       )
     );
+    return null;
+  }
+}
+
+export async function checkRobloxPresenceWithCookie(
+  userId: number,
+  cookie: string
+): Promise<AuthenticatedPresenceInfo | null> {
+  try {
+    cookie = cookie.trim().replace(/[\r\n\t]/g, "");
+
+    const presenceResponse = await fetch(
+      `https://presence.roblox.com/v1/presence/users`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `.ROBLOSECURITY=${cookie}`,
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        },
+        body: JSON.stringify({ userIds: [userId] }),
+      }
+    );
+
+    if (!presenceResponse.ok) {
+      return null;
+    }
+
+    const presenceData =
+      (await presenceResponse.json()) as RobloxPresenceResponse;
+
+    if (
+      !presenceData.userPresences ||
+      presenceData.userPresences.length === 0
+    ) {
+      return null;
+    }
+
+    const presence = presenceData.userPresences[0];
+    if (!presence) {
+      return null;
+    }
+
+    const presenceInfo = {
+      isOnline: presence.userPresenceType > 0,
+      isInGame: presence.userPresenceType === 2,
+      lastLocation: presence.lastLocation || "Unknown",
+      placeId: presence.placeId,
+      rootPlaceId: presence.rootPlaceId,
+      gameId: presence.gameId,
+      universeId: presence.universeId,
+      lastOnline: presence.lastOnline,
+      userPresenceType: presence.userPresenceType,
+    };
+
+    return presenceInfo;
+  } catch (error) {
     return null;
   }
 }
