@@ -1,4 +1,4 @@
-import { select } from "@clack/prompts";
+import { select } from "@/utils/prompts";
 import type { DeleteOption } from "./types";
 
 export async function getDeleteOption(): Promise<DeleteOption | null> {

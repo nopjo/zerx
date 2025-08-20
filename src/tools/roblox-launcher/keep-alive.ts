@@ -1,16 +1,20 @@
 import { text, confirm } from "@clack/prompts";
 import colors from "picocolors";
 import { Logger } from "@/utils/logger";
-import { rebootAllLDPlayerInstances } from "@/utils/ld";
+import { rebootAllEmulatorInstances } from "@/utils/emu/abstraction";
+import type { EmulatorType } from "@/types/tool";
 import { getRobloxLauncherConfig, saveRobloxLauncherConfig } from "./config";
 import { getDeviceStatuses, rebootDevice } from "./device-manager";
 import { checkPresenceForInstances } from "./presence";
 import { launchRobloxGame } from "./game-launcher";
 
-export async function keepAliveMode(): Promise<void> {
+export async function keepAliveMode(
+  emulatorType: EmulatorType = "ldplayer"
+): Promise<void> {
   const launcherConfig = getRobloxLauncherConfig();
+  const emulatorName = emulatorType === "mumu" ? "MuMu Player" : "LDPlayer";
 
-  Logger.title("[~] Keep Alive Mode Configuration");
+  Logger.title(`[~] Keep Alive Mode Configuration (${emulatorName})`);
   Logger.muted(
     "Set up automatic monitoring with crash detection and presence checking",
     { indent: 1 }
@@ -30,8 +34,7 @@ export async function keepAliveMode(): Promise<void> {
   if (!intervalText || typeof intervalText === "symbol") return;
 
   const enableAutoReboot = await confirm({
-    message:
-      "Enable auto-reboot of LDPlayer instances every 3 hours? (Prevents memory issues)",
+    message: `Enable auto-reboot of ${emulatorName} instances every 3 hours? (Prevents memory issues)`,
   });
 
   let autoRebootHours = 0;
@@ -61,12 +64,17 @@ export async function keepAliveMode(): Promise<void> {
   launcherConfig.autoRebootInterval = autoRebootHours;
   saveRobloxLauncherConfig(launcherConfig);
 
-  Logger.success("[~] Keep Alive Mode Started", { spaceBefore: true });
+  Logger.success(`[~] Keep Alive Mode Started (${emulatorName})`, {
+    spaceBefore: true,
+  });
   Logger.muted(`Checking every ${interval / 1000} seconds...`, { indent: 1 });
   if (autoRebootHours > 0) {
-    Logger.muted(`Auto-rebooting LDPlayer every ${autoRebootHours} hours`, {
-      indent: 1,
-    });
+    Logger.muted(
+      `Auto-rebooting ${emulatorName} every ${autoRebootHours} hours`,
+      {
+        indent: 1,
+      }
+    );
   }
   if (enablePresenceCheck) {
     Logger.muted(
@@ -90,7 +98,7 @@ export async function keepAliveMode(): Promise<void> {
         Logger.warning(
           `[~] ${autoRebootHours} hours passed - Starting auto-reboot...`
         );
-        await rebootAllLDPlayerInstances();
+        await rebootAllEmulatorInstances(emulatorType);
         lastRebootTime = now;
 
         Logger.info("[>] Re-launching assigned games after reboot...");

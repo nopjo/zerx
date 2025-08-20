@@ -3,6 +3,7 @@ import {
   LAUNCHER_CONFIG_KEY,
   DEFAULT_DEVICE_TIMEOUT,
   DEFAULT_PRESENCE_CHECK_INTERVAL,
+  DEFAULT_LAUNCH_DELAY_MS,
 } from "./constants";
 import type { RobloxLauncherConfig } from "./types";
 
@@ -21,6 +22,7 @@ export function getRobloxLauncherConfig(): RobloxLauncherConfig {
       launcherConfig?.presenceCheckInterval || DEFAULT_PRESENCE_CHECK_INTERVAL,
     deviceTimeoutSeconds:
       launcherConfig?.deviceTimeoutSeconds || DEFAULT_DEVICE_TIMEOUT,
+    launchDelayMs: launcherConfig?.launchDelayMs || DEFAULT_LAUNCH_DELAY_MS,
     defaultGame: launcherConfig?.defaultGame || undefined,
     gameTemplates: launcherConfig?.gameTemplates || [],
   };

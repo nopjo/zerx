@@ -1,6 +1,7 @@
 import { confirm } from "@clack/prompts";
 import colors from "picocolors";
 import { Logger } from "@/utils/logger";
+import { getRobloxLauncherConfig } from "./config";
 import { getDeviceStatuses } from "./device-manager";
 import { launchRobloxGame } from "./game-launcher";
 
@@ -22,10 +23,16 @@ export async function launchAssignedGames(): Promise<void> {
   });
   if (!shouldLaunch) return;
 
+  const launcherConfig = getRobloxLauncherConfig();
+
   Logger.success("[^] Launching games...", {
     spaceBefore: true,
     spaceAfter: true,
   });
+  Logger.muted(
+    `Using ${launcherConfig.launchDelayMs}ms delay between launches`,
+    { indent: 1 }
+  );
 
   for (const instance of instancesWithGames) {
     const deviceStatus = statuses.find((d) => d.deviceId === instance.deviceId);
@@ -53,7 +60,9 @@ export async function launchAssignedGames(): Promise<void> {
       );
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) =>
+      setTimeout(resolve, launcherConfig.launchDelayMs)
+    );
   }
 
   Logger.success("Launch sequence complete!", { spaceBefore: true });

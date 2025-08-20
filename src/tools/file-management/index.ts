@@ -1,4 +1,4 @@
-import { select, confirm, outro, spinner } from "@clack/prompts";
+import { confirm, outro, spinner } from "@clack/prompts";
 import colors from "picocolors";
 import { BaseTool, type ToolResult, ToolRegistry } from "@/types/tool";
 import {
@@ -12,6 +12,7 @@ import { getDevicesWithExecutor } from "./executor-detection";
 import { browseAndManageFiles } from "./file-browser";
 import { copyToDevices } from "./file-operations";
 import type { ExecutorInfo, FileSelection } from "./types";
+import { select } from "@/utils/prompts";
 
 export class FileManagementTool extends BaseTool {
   constructor() {
@@ -68,7 +69,10 @@ export class FileManagementTool extends BaseTool {
           devices.data!.readyDevices
         );
         if (!sourceDevice.success) {
-          const tryAgain = await confirm({ message: "Try another executor?" });
+          const tryAgain = await confirm({
+            message: "Try another executor?",
+            initialValue: false,
+          });
           if (tryAgain !== true) {
             outro(colors.yellow("Cancelled"));
             return {
@@ -87,6 +91,7 @@ export class FileManagementTool extends BaseTool {
 
         const selectAnother = await confirm({
           message: "Select another executor?",
+          initialValue: false,
         });
         if (selectAnother !== true) {
           outro(colors.green("File management complete"));
@@ -212,7 +217,10 @@ export class FileManagementTool extends BaseTool {
       { spaceBefore: true }
     );
 
-    const result = await confirm({ message: "Try another executor?" });
+    const result = await confirm({
+      message: "Try another executor?",
+      initialValue: false,
+    });
     return result === true;
   }
 

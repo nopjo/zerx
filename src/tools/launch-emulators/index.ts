@@ -1,8 +1,16 @@
 import { outro, confirm, spinner } from "@clack/prompts";
 import colors from "picocolors";
-import { BaseTool, type ToolResult, ToolRegistry } from "@/types/tool";
-import { getLDPlayerInstances, getLDPlayerPath } from "@/utils/ld";
+import {
+  BaseTool,
+  type ToolResult,
+  type ToolRunContext,
+  ToolRegistry,
+} from "@/types/tool";
 import { Logger } from "@/utils/logger";
+import {
+  getEmulatorService,
+  type EmulatorInstance,
+} from "@/utils/emu/abstraction";
 import { analyzeInstances, displayInstanceAnalysis } from "./instance-analysis";
 import { getDelayConfiguration } from "./launch-configuration";
 import { launchInstancesSequentially } from "./instance-launch";
@@ -13,24 +21,43 @@ export class LaunchEmulatorsTool extends BaseTool {
     super({
       id: "launch-emulators",
       label: "Launch All Emulators (Boot Up All Stopped Instances)",
-      description: "Boot up all stopped LDPlayer instances",
+      description: "Boot up all stopped emulator instances",
     });
   }
 
-  protected override async beforeExecute(): Promise<void> {
+  protected override async beforeExecute(
+    context?: ToolRunContext
+  ): Promise<void> {
+    const emulatorName =
+      context?.emulatorType === "mumu" ? "MuMu Player" : "LDPlayer";
     Logger.title(`[^] ${this.label}`);
-    Logger.muted(this.description, { indent: 1 });
+    Logger.muted(`${this.description} (${emulatorName})`, { indent: 1 });
   }
 
-  override async execute(): Promise<ToolResult> {
-    try {
-      const ldPath = await this.getLDPlayerPath();
-      if (!ldPath.success) return ldPath;
+  override async execute(context?: ToolRunContext): Promise<ToolResult> {
+    if (!context?.emulatorType) {
+      return {
+        success: false,
+        message: "Emulator type not specified",
+      };
+    }
 
-      const instances = await this.loadInstances(ldPath.data!);
+    try {
+      const emulatorService = getEmulatorService(context.emulatorType);
+
+      const emulatorPath = await this.getEmulatorPath(
+        emulatorService,
+        context.emulatorType
+      );
+      if (!emulatorPath.success) return emulatorPath;
+
+      const instances = await this.loadInstances(emulatorService);
       if (!instances.success) return instances;
 
-      const analysis = this.analyzeAndDisplayInstances(instances.data!);
+      const analysis = this.analyzeAndDisplayInstances(
+        instances.data!,
+        emulatorService
+      );
       if (!analysis.needsLaunch) {
         return this.handleAllInstancesRunning(analysis);
       }
@@ -51,7 +78,7 @@ export class LaunchEmulatorsTool extends BaseTool {
       if (!confirmed.success) return confirmed;
 
       return await this.executeLaunchOperation(
-        ldPath.data!,
+        emulatorService,
         analysis.stoppedInstances,
         delayMs
       );
@@ -66,45 +93,52 @@ export class LaunchEmulatorsTool extends BaseTool {
     }
   }
 
-  private async getLDPlayerPath(): Promise<ToolResult & { data?: string }> {
-    Logger.muted("[>] Please specify your LDPlayer installation path...");
-    const ldPath = await getLDPlayerPath();
+  private async getEmulatorPath(
+    emulatorService: any,
+    emulatorType: string
+  ): Promise<ToolResult & { data?: string }> {
+    const emulatorName = emulatorType === "mumu" ? "MuMu Player" : "LDPlayer";
+    Logger.muted(
+      `[>] Please specify your ${emulatorName} installation path...`
+    );
 
-    if (!ldPath) {
+    const emulatorPath = await emulatorService.getPath();
+
+    if (!emulatorPath) {
       outro(colors.yellow("[!] Operation cancelled"));
       return {
         success: false,
-        message: "Operation cancelled - no LDPlayer path specified",
+        message: `Operation cancelled - no ${emulatorName} path specified`,
       };
     }
 
-    Logger.success(`[+] Using LDPlayer at: ${ldPath}`);
+    Logger.success(`[+] Using ${emulatorName} at: ${emulatorPath}`);
     return {
       success: true,
-      message: "LDPlayer path confirmed",
-      data: ldPath,
+      message: `${emulatorName} path confirmed`,
+      data: emulatorPath,
     };
   }
 
   private async loadInstances(
-    ldPath: string
-  ): Promise<ToolResult & { data?: any[] }> {
+    emulatorService: any
+  ): Promise<ToolResult & { data?: EmulatorInstance[] }> {
     const loadingSpinner = spinner();
-    loadingSpinner.start(colors.gray("Loading LDPlayer instances..."));
+    loadingSpinner.start(colors.gray("Loading emulator instances..."));
 
     try {
-      const instances = await getLDPlayerInstances(ldPath);
+      const instances = await emulatorService.getInstances();
       loadingSpinner.stop(colors.green("[+] Instances loaded"));
 
       if (instances.length === 0) {
         outro(
           colors.red(
-            "[X] No LDPlayer instances found. Create some instances first."
+            "[X] No emulator instances found. Create some instances first."
           )
         );
         return {
           success: false,
-          message: "No LDPlayer instances found",
+          message: "No emulator instances found",
         };
       }
 
@@ -125,9 +159,12 @@ export class LaunchEmulatorsTool extends BaseTool {
     }
   }
 
-  private analyzeAndDisplayInstances(instances: any[]) {
+  private analyzeAndDisplayInstances(
+    instances: EmulatorInstance[],
+    emulatorService: any
+  ) {
     const analysis = analyzeInstances(instances);
-    displayInstanceAnalysis(analysis);
+    displayInstanceAnalysis(analysis, emulatorService);
     return analysis;
   }
 
@@ -181,8 +218,8 @@ export class LaunchEmulatorsTool extends BaseTool {
   }
 
   private async executeLaunchOperation(
-    ldPath: string,
-    stoppedInstances: any[],
+    emulatorService: any,
+    stoppedInstances: EmulatorInstance[],
     delayMs: number
   ): Promise<ToolResult> {
     Logger.success("[^] Starting sequential launch operation...", {
@@ -192,7 +229,7 @@ export class LaunchEmulatorsTool extends BaseTool {
 
     try {
       const results = await launchInstancesSequentially(
-        ldPath,
+        emulatorService,
         stoppedInstances,
         delayMs
       );

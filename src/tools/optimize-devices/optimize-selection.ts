@@ -1,6 +1,6 @@
-import { select } from "@clack/prompts";
-import type { LDPlayerInstance } from "@/utils/ld";
+import type { LDPlayerInstance } from "@/utils/emu/ld";
 import type { OptimizeMode } from "./types";
+import { select } from "@/utils/prompts";
 
 export async function getOptimizeMode(
   instances: LDPlayerInstance[],

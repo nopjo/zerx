@@ -1,7 +1,8 @@
-import { text, select, confirm } from "@clack/prompts";
+import { text, confirm } from "@clack/prompts";
 import { Logger } from "@/utils/logger";
 import { getRobloxLauncherConfig, saveRobloxLauncherConfig } from "./config";
 import type { GameConfig, GameTemplate } from "./types";
+import { select } from "@/utils/prompts";
 
 export async function getGameConfig(
   gameType: string
@@ -80,7 +81,7 @@ export async function setDefaultGame(): Promise<void> {
     return;
   }
 
-  const gameConfig = await getGameConfig(gameType);
+  const gameConfig = await getGameConfig(gameType as string);
   if (!gameConfig) return;
 
   launcherConfig.defaultGame = gameConfig;
@@ -118,7 +119,7 @@ async function createGameTemplate(): Promise<void> {
 
   if (!gameType || typeof gameType === "symbol") return;
 
-  const gameConfig = await getGameConfig(gameType);
+  const gameConfig = await getGameConfig(gameType as string);
   if (!gameConfig) return;
 
   const launcherConfig = getRobloxLauncherConfig();

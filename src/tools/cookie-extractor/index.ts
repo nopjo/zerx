@@ -24,10 +24,7 @@ export class CookieExtractorTool extends BaseTool {
 
   protected override async beforeExecute(): Promise<void> {
     Logger.title(`[*] ${this.label}`);
-    Logger.muted(this.description, {
-      indent: 1,
-    });
-
+    Logger.muted(this.description, { indent: 1 });
     Logger.warning(
       "[!] WARNING: Do NOT share the extracted cookies with anyone!"
     );
@@ -53,10 +50,7 @@ export class CookieExtractorTool extends BaseTool {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       outro(colors.red(`[X] Unexpected error: ${errorMessage}`));
-      return {
-        success: false,
-        message: `Unexpected error: ${errorMessage}`,
-      };
+      return { success: false, message: `Unexpected error: ${errorMessage}` };
     }
   }
 
@@ -95,16 +89,12 @@ export class CookieExtractorTool extends BaseTool {
       if (accounts.length === 0) {
         extractSpinner.stop(colors.yellow("[!] No accounts found in file"));
         outro(colors.yellow("[@] AccountData.json contains no accounts"));
-        return {
-          success: false,
-          message: "No accounts found in file",
-        };
+        return { success: false, message: "No accounts found in file" };
       }
 
       extractSpinner.stop(
         colors.green("[+] AccountData.json decrypted and parsed successfully")
       );
-
       return {
         success: true,
         message: `Processed ${accounts.length} accounts`,
@@ -130,9 +120,7 @@ export class CookieExtractorTool extends BaseTool {
     try {
       displayAccountSummary(accounts);
       displayAccountDetails(accounts);
-
       const cookies = extractCookies(accounts);
-
       return {
         success: true,
         message: `Extracted cookies from ${cookies.length} accounts`,
@@ -179,6 +167,7 @@ export class CookieExtractorTool extends BaseTool {
             outputPath,
             validCookies: validCount,
             totalAccounts: cookies.length,
+            useTimeout: true,
           },
         };
       } else {
@@ -198,6 +187,7 @@ export class CookieExtractorTool extends BaseTool {
             outputPath,
             validCookies: 0,
             totalAccounts: cookies.length,
+            useTimeout: true,
           },
         };
       }

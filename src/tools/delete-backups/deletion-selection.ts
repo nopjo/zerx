@@ -1,4 +1,4 @@
-import { select } from "@clack/prompts";
+import { select } from "@/utils/prompts";
 import { calculateTotalSize } from "./backup-scanning";
 import type { BackupFile, DeleteChoice } from "./types";
 

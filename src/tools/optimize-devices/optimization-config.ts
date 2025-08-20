@@ -1,6 +1,6 @@
-import { select } from "@clack/prompts";
 import { Logger } from "@/utils/logger";
 import type { OptimizeConfiguration } from "./types";
+import { select } from "@/utils/prompts";
 
 const coreOptions = [
   { value: 1, label: "1 Core - Ultra Light" },

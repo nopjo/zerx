@@ -4,7 +4,7 @@ import colors from "picocolors";
 import path from "path";
 import { promisify } from "util";
 import { exec } from "child_process";
-import { updateConfig, getConfigValue } from "./config";
+import { updateConfig, getConfigValue } from "@/utils/config";
 import { Logger } from "@/utils/logger";
 
 const execAsync = promisify(exec);

@@ -1,6 +1,11 @@
-import { spinner, outro, select } from "@clack/prompts";
+import { spinner, outro } from "@clack/prompts";
 import colors from "picocolors";
-import { BaseTool, type ToolResult, ToolRegistry } from "@/types/tool";
+import {
+  BaseTool,
+  type ToolResult,
+  type ToolRunContext,
+  ToolRegistry,
+} from "@/types/tool";
 import { Logger } from "@/utils/logger";
 import { getDeviceStatuses } from "./device-manager";
 import { displayDeviceStatuses } from "./ui-helpers";
@@ -9,6 +14,7 @@ import { manageGameTemplates, setDefaultGame } from "./game-config";
 import { configureAdvancedSettings } from "./settings";
 import { keepAliveMode } from "./keep-alive";
 import { launchAssignedGames } from "./launcher-actions";
+import { select } from "@/utils/prompts";
 
 export class RobloxLauncherTool extends BaseTool {
   constructor() {
@@ -20,14 +26,25 @@ export class RobloxLauncherTool extends BaseTool {
     });
   }
 
-  protected override async beforeExecute(): Promise<void> {
+  protected override async beforeExecute(
+    context?: ToolRunContext
+  ): Promise<void> {
+    const emulatorName =
+      context?.emulatorType === "mumu" ? "MuMu Player" : "LDPlayer";
     Logger.title(`[>] ${this.label}`);
-    Logger.muted(this.description, { indent: 1 });
+    Logger.muted(`${this.description} (${emulatorName})`, { indent: 1 });
   }
 
-  override async execute(): Promise<ToolResult> {
+  override async execute(context?: ToolRunContext): Promise<ToolResult> {
+    if (!context?.emulatorType) {
+      return {
+        success: false,
+        message: "Emulator type not specified",
+      };
+    }
+
     try {
-      return await this.showMainMenu();
+      return await this.showMainMenu(context);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -39,7 +56,7 @@ export class RobloxLauncherTool extends BaseTool {
     }
   }
 
-  private async showMainMenu(): Promise<ToolResult> {
+  private async showMainMenu(context: ToolRunContext): Promise<ToolResult> {
     const loadingSpinner = spinner();
     loadingSpinner.start(
       colors.gray("Loading device and instance statuses...")
@@ -71,14 +88,17 @@ export class RobloxLauncherTool extends BaseTool {
         };
       }
 
-      return await this.handleAction(action as string);
+      return await this.handleAction(action as string, context);
     } catch (error) {
       loadingSpinner.stop();
       throw error;
     }
   }
 
-  private async handleAction(action: string): Promise<ToolResult> {
+  private async handleAction(
+    action: string,
+    context: ToolRunContext
+  ): Promise<ToolResult> {
     try {
       switch (action) {
         case "launch":
@@ -97,10 +117,10 @@ export class RobloxLauncherTool extends BaseTool {
           await configureAdvancedSettings();
           break;
         case "keepalive":
-          await keepAliveMode();
+          await keepAliveMode(context.emulatorType);
           break;
         case "refresh":
-          return await this.showMainMenu();
+          return await this.showMainMenu(context);
         default:
           return {
             success: false,

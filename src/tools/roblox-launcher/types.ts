@@ -41,6 +41,7 @@ export interface RobloxLauncherConfig {
   autoRebootInterval: number;
   presenceCheckInterval: number;
   deviceTimeoutSeconds: number;
+  launchDelayMs: number;
   defaultGame?: GameConfig;
   gameTemplates: GameTemplate[];
 }

@@ -1,5 +1,7 @@
 import { TOOL_ORDER } from "@/constants";
 
+export type EmulatorType = "ldplayer" | "mumu";
+
 export interface ToolConfig {
   id: string;
   label: string;
@@ -10,6 +12,10 @@ export interface ToolResult {
   success: boolean;
   message?: string;
   data?: any;
+}
+
+export interface ToolRunContext {
+  emulatorType?: EmulatorType;
 }
 
 export abstract class BaseTool {
@@ -31,24 +37,27 @@ export abstract class BaseTool {
     return this.config.description || "";
   }
 
-  abstract execute(): Promise<ToolResult>;
+  abstract execute(context?: ToolRunContext): Promise<ToolResult>;
 
-  protected async beforeExecute(): Promise<void> {}
+  protected async beforeExecute(context?: ToolRunContext): Promise<void> {}
 
-  protected async afterExecute(result: ToolResult): Promise<void> {}
+  protected async afterExecute(
+    result: ToolResult,
+    context?: ToolRunContext
+  ): Promise<void> {}
 
-  async run(): Promise<ToolResult> {
+  async run(context?: ToolRunContext): Promise<ToolResult> {
     try {
-      await this.beforeExecute();
-      const result = await this.execute();
-      await this.afterExecute(result);
+      await this.beforeExecute(context);
+      const result = await this.execute(context);
+      await this.afterExecute(result, context);
       return result;
     } catch (error) {
       const errorResult: ToolResult = {
         success: false,
         message: error instanceof Error ? error.message : "Unknown error",
       };
-      await this.afterExecute(errorResult);
+      await this.afterExecute(errorResult, context);
       return errorResult;
     }
   }

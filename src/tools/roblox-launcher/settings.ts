@@ -33,9 +33,32 @@ export async function configureAdvancedSettings(): Promise<void> {
 
   if (!presenceCheckText || typeof presenceCheckText === "symbol") return;
 
+  const launchDelayText = await text({
+    message: "Launch delay between games (milliseconds):",
+    placeholder: launcherConfig.launchDelayMs.toString(),
+    validate: (value) => {
+      const num = parseInt(value);
+      return isNaN(num) || num < 1000 || num > 60000
+        ? "Enter a number between 1000 and 60000 milliseconds (1-60 seconds)"
+        : undefined;
+    },
+  });
+
+  if (!launchDelayText || typeof launchDelayText === "symbol") return;
+
   launcherConfig.deviceTimeoutSeconds = parseInt(deviceTimeoutText);
   launcherConfig.presenceCheckInterval = parseInt(presenceCheckText);
+  launcherConfig.launchDelayMs = parseInt(launchDelayText);
   saveRobloxLauncherConfig(launcherConfig);
 
   Logger.success("[+] Advanced settings saved!");
+  Logger.muted(`Device timeout: ${launcherConfig.deviceTimeoutSeconds}s`, {
+    indent: 1,
+  });
+  Logger.muted(`Presence check: ${launcherConfig.presenceCheckInterval}m`, {
+    indent: 1,
+  });
+  Logger.muted(`Launch delay: ${launcherConfig.launchDelayMs}ms`, {
+    indent: 1,
+  });
 }

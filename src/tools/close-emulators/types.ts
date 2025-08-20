@@ -1,4 +1,4 @@
-import type { LDPlayerInstance } from "@/utils/ld";
+import type { LDPlayerInstance } from "@/utils/emu/ld";
 
 export interface ShutdownResult {
   instance: LDPlayerInstance;

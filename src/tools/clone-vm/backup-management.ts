@@ -7,7 +7,7 @@ import {
   isInstanceRunning,
   stopInstance,
   type LDPlayerInstance,
-} from "@/utils/ld";
+} from "@/utils/emu/ld";
 
 export function ensureBackupDirectory(): string {
   const backupDir = path.join(process.cwd(), "ldplayer_backups");

@@ -19,11 +19,10 @@ async function getRunningEmulatorPorts(): Promise<number[]> {
     const emulatorPorts: number[] = [];
 
     for (const line of lines) {
-      // Look for LISTENING ports in emulator range
       const match = line.match(/TCP\s+\S*:(\d{4})\s+\S+\s+LISTENING/);
       if (match && match[1]) {
         const port = parseInt(match[1]);
-        // Check if it's an ADB port (odd numbers 5555-5700)
+
         if (port % 2 === 1 && port >= 5555 && port <= 5700) {
           emulatorPorts.push(port);
         }
@@ -48,7 +47,6 @@ async function connectToExtendedEmulators(): Promise<void> {
     `Found ${runningPorts.length} potential emulator ports: ${runningPorts.join(", ")}`
   );
 
-  // Get currently connected devices to avoid duplicate connections
   const currentDevices = new Set<string>();
   try {
     const { stdout } = await execAsync("adb devices");
@@ -62,14 +60,11 @@ async function connectToExtendedEmulators(): Promise<void> {
         }
       }
     }
-  } catch {
-    // Ignore errors getting current devices
-  }
+  } catch {}
 
-  // Try to connect to any ports that aren't already connected
   const connectPromises = runningPorts
     .filter((port) => {
-      const deviceId = `emulator-${port - 1}`; // Console port
+      const deviceId = `emulator-${port - 1}`;
       const localhostId = `localhost:${port}`;
       return !currentDevices.has(deviceId) && !currentDevices.has(localhostId);
     })
@@ -78,7 +73,6 @@ async function connectToExtendedEmulators(): Promise<void> {
         await execAsync(`adb connect localhost:${port}`, { timeout: 5000 });
         return port;
       } catch {
-        // Ignore connection failures
         return null;
       }
     });

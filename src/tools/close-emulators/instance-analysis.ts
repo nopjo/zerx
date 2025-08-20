@@ -1,5 +1,5 @@
 import colors from "picocolors";
-import { printInstancesList, type LDPlayerInstance } from "@/utils/ld";
+import { printInstancesList, type LDPlayerInstance } from "@/utils/emu/ld";
 import { Logger } from "@/utils/logger";
 
 export interface InstanceAnalysis {
@@ -29,11 +29,6 @@ export function analyzeInstances(
 
 export function displayInstanceAnalysis(analysis: InstanceAnalysis): void {
   printInstancesList(analysis.allInstances);
-
-  if (!analysis.needsShutdown) {
-    Logger.success("All instances are already stopped!", { spaceBefore: true });
-    return;
-  }
 
   Logger.warning(
     `[!] Found ${colors.bold(

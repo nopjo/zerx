@@ -1,4 +1,4 @@
-import type { LDPlayerInstance } from "@/utils/ld";
+import type { LDPlayerInstance } from "@/utils/emu/ld";
 
 export interface CloneConfiguration {
   sourceInstance: LDPlayerInstance;

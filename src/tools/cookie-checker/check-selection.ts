@@ -1,4 +1,4 @@
-import { select } from "@clack/prompts";
+import { select } from "@/utils/prompts";
 import type { RobloxInstance, CheckType } from "./types";
 
 export async function getCheckType(

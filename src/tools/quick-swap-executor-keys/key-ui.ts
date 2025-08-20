@@ -1,4 +1,4 @@
-import { select, confirm, text } from "@clack/prompts";
+import { confirm, text } from "@clack/prompts";
 import colors from "picocolors";
 import { Logger } from "@/utils/logger";
 import {
@@ -7,6 +7,7 @@ import {
   validateKeyContent,
 } from "./key-config";
 import type { ExecutorKeyInfo, DeviceKeyStatus } from "./types";
+import { select } from "@/utils/prompts";
 
 export async function selectExecutor(): Promise<{
   success: boolean;

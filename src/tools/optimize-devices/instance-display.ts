@@ -1,6 +1,6 @@
 import colors from "picocolors";
 import { Logger } from "@/utils/logger";
-import type { LDPlayerInstance } from "@/utils/ld";
+import type { LDPlayerInstance } from "@/utils/emu/ld";
 
 export function displayInstances(instances: LDPlayerInstance[]): void {
   Logger.info("[#] Available LDPlayer Instances:", { spaceBefore: true });

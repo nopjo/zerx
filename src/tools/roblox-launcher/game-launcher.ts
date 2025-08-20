@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import { Logger } from "@/utils/logger";
+import { getRobloxLauncherConfig } from "./config";
 import type { GameConfig } from "./types";
 
 const execAsync = promisify(exec);
@@ -26,7 +27,10 @@ export async function launchRobloxGame(
       `adb -s ${deviceId} shell "am start -a android.intent.action.VIEW -d '${launchUrl}' -p ${packageName} -f 0x10000000"`
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const launcherConfig = getRobloxLauncherConfig();
+    await new Promise((resolve) =>
+      setTimeout(resolve, launcherConfig.launchDelayMs)
+    );
     return true;
   } catch (error) {
     Logger.error(`[X] Launch failed: ${error}`, { indent: 1 });

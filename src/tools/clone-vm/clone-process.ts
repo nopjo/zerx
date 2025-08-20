@@ -6,7 +6,7 @@ import {
   restoreBackup,
   renameInstance,
   type LDPlayerInstance,
-} from "@/utils/ld";
+} from "@/utils/emu/ld";
 import { Logger } from "@/utils/logger";
 import type { CloneResult } from "./types";
 

@@ -1,13 +1,13 @@
-import type { LDPlayerInstance } from "@/utils/ld";
+import type { EmulatorInstance } from "@/utils/emu/abstraction";
 
 export interface LaunchResult {
-  instance: LDPlayerInstance;
+  instance: EmulatorInstance;
   success: boolean;
   error?: string;
 }
 
 export interface LaunchConfiguration {
-  stoppedInstances: LDPlayerInstance[];
+  stoppedInstances: EmulatorInstance[];
   delayMs: number;
 }
 

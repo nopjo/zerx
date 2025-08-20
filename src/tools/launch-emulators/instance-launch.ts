@@ -1,26 +1,30 @@
 import colors from "picocolors";
-import {
-  launchInstance,
-  isInstanceRunning,
-  type LDPlayerInstance,
-} from "@/utils/ld";
 import { Logger } from "@/utils/logger";
-import type { LaunchResult } from "./types";
+import type {
+  EmulatorInstance,
+  EmulatorService,
+} from "@/utils/emu/abstraction";
+
+export interface LaunchResult {
+  instance: EmulatorInstance;
+  success: boolean;
+  error?: string;
+}
 
 export async function launchSingleInstance(
-  ldPath: string,
-  instance: LDPlayerInstance
+  emulatorService: EmulatorService,
+  instance: EmulatorInstance
 ): Promise<LaunchResult> {
   try {
     Logger.muted(`[^] Launching: ${colors.white(instance.name)}...`, {
       indent: 1,
     });
 
-    await launchInstance(ldPath, instance.index);
+    await emulatorService.launchInstance(instance.index);
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const isRunning = await isInstanceRunning(ldPath, instance.index);
+    const isRunning = await emulatorService.isInstanceRunning(instance.index);
 
     if (isRunning) {
       Logger.success(
@@ -46,8 +50,8 @@ export async function launchSingleInstance(
 }
 
 export async function launchInstancesSequentially(
-  ldPath: string,
-  instances: LDPlayerInstance[],
+  emulatorService: EmulatorService,
+  instances: EmulatorInstance[],
   delayMs: number
 ): Promise<LaunchResult[]> {
   const results: LaunchResult[] = [];
@@ -62,7 +66,7 @@ export async function launchInstancesSequentially(
 
     Logger.info(`[#] Progress: ${i + 1}/${instances.length}`);
 
-    const result = await launchSingleInstance(ldPath, instance);
+    const result = await launchSingleInstance(emulatorService, instance);
     results.push(result);
 
     if (i < instances.length - 1 && delayMs > 0) {

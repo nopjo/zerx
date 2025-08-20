@@ -1,10 +1,8 @@
 import path from "path";
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { Logger } from "@/utils/logger";
-
-const execAsync = promisify(exec);
 
 const POWERSHELL_DECRYPT_SCRIPT = `
 try {
@@ -84,15 +82,43 @@ export async function decryptFile(filePath: string): Promise<string> {
 
     writeFileSync(tempScriptPath, psScript);
 
-    const { stdout, stderr } = await execAsync(
-      `powershell -ExecutionPolicy Bypass -NoProfile -File "${tempScriptPath}"`
+    const powershellProcess = spawn(
+      "powershell",
+      ["-ExecutionPolicy", "Bypass", "-NoProfile", "-File", tempScriptPath],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: false,
+      }
     );
 
-    if (stderr && stderr.trim()) {
-      throw new Error(`PowerShell error: ${stderr}`);
+    let stdout = "";
+    let stderr = "";
+
+    powershellProcess.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    powershellProcess.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    const result = await new Promise<{ stdout: string; stderr: string }>(
+      (resolve, reject) => {
+        powershellProcess.on("close", (code) => {
+          resolve({ stdout, stderr });
+        });
+
+        powershellProcess.on("error", (error) => {
+          reject(error);
+        });
+      }
+    );
+
+    if (result.stderr && result.stderr.trim()) {
+      throw new Error(`PowerShell error: ${result.stderr}`);
     }
 
-    if (!stdout.includes("SUCCESS")) {
+    if (!result.stdout.includes("SUCCESS")) {
       throw new Error("PowerShell script did not complete successfully");
     }
 
@@ -105,6 +131,8 @@ export async function decryptFile(filePath: string): Promise<string> {
     const decryptedData = readFileSync(tempDecryptedPath, "utf8");
     return decryptedData;
   } finally {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     try {
       if (existsSync(tempScriptPath)) {
         unlinkSync(tempScriptPath);

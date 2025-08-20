@@ -1,4 +1,4 @@
-import { select, spinner } from "@clack/prompts";
+import { spinner } from "@clack/prompts";
 import colors from "picocolors";
 import path from "path";
 import {
@@ -14,6 +14,7 @@ import type {
   FileAction,
   AdbDevice,
 } from "./types";
+import { select } from "@/utils/prompts";
 
 export async function browseAndManageFiles(
   deviceId: string,
@@ -186,7 +187,7 @@ async function selectDirectory(
   });
 
   if (dirChoice && typeof dirChoice !== "symbol" && dirChoice !== "cancel") {
-    return directories[parseInt(dirChoice)] || null;
+    return directories[parseInt(dirChoice as string)] || null;
   }
   return null;
 }
@@ -206,7 +207,7 @@ async function selectFile(
   });
 
   if (fileChoice && typeof fileChoice !== "symbol" && fileChoice !== "cancel") {
-    return files[parseInt(fileChoice)] || null;
+    return files[parseInt(fileChoice as string)] || null;
   }
   return null;
 }

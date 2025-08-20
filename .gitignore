@@ -4,6 +4,8 @@ node_modules
 # output
 output
 ldplayer_backups
+mumu_backups
+
 out
 dist
 *.tgz
@@ -41,3 +43,4 @@ build
 bun.lock
 
 config.json
+zerx-v1.2.0-windows-x64.zip

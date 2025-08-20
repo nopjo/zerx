@@ -1,9 +1,10 @@
-import { select, confirm } from "@clack/prompts";
+import { confirm } from "@clack/prompts";
 import { Logger } from "@/utils/logger";
 import { getRobloxLauncherConfig, saveRobloxLauncherConfig } from "./config";
 import { getDeviceStatuses } from "./device-manager";
 import { getGameConfig } from "./game-config";
 import type { UsernameGameAssignment, GameConfig } from "./types";
+import { select } from "@/utils/prompts";
 
 export async function assignGameToUsername(): Promise<void> {
   while (true) {
@@ -131,7 +132,7 @@ export async function assignGameToUsername(): Promise<void> {
         continue;
       }
     } else {
-      const config = await getGameConfig(gameType);
+      const config = await getGameConfig(gameType as string);
       if (!config) continue;
       gameConfig = config;
     }
@@ -140,7 +141,7 @@ export async function assignGameToUsername(): Promise<void> {
       (a) => a.username === selectedUsername
     );
     const assignment: UsernameGameAssignment = {
-      username: selectedUsername,
+      username: selectedUsername as string,
       gameConfig,
     };
 

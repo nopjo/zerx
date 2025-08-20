@@ -5,7 +5,7 @@ import {
   stopInstance,
   isInstanceRunning,
   type LDPlayerInstance,
-} from "@/utils/ld";
+} from "@/utils/emu/ld";
 import { Logger } from "@/utils/logger";
 import type { ShutdownResult } from "./types";
 

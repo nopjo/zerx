@@ -1,4 +1,4 @@
-import { select } from "@clack/prompts";
+import { select } from "@/utils/prompts";
 import type { InstanceWithUser, CloseMode } from "./types";
 
 export async function getCloseMode(

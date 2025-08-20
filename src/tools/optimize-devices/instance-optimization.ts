@@ -3,7 +3,7 @@ import { promisify } from "util";
 import { spinner } from "@clack/prompts";
 import colors from "picocolors";
 import { Logger } from "@/utils/logger";
-import type { LDPlayerInstance } from "@/utils/ld";
+import type { LDPlayerInstance } from "@/utils/emu/ld";
 import type { OptimizeResult, OptimizeConfiguration } from "./types";
 
 const execAsync = promisify(exec);

@@ -1,4 +1,4 @@
-import { outro, confirm, select, spinner } from "@clack/prompts";
+import { outro, spinner } from "@clack/prompts";
 import colors from "picocolors";
 import { BaseTool, type ToolResult, ToolRegistry } from "@/types/tool";
 import { getConnectedDevices, printConnectedDevices } from "@/utils/adb";
@@ -10,6 +10,7 @@ import {
 } from "./clone-detection";
 import { loginToClone } from "./login-process";
 import type { RobloxClone, LoginResult, LoginMode } from "./types";
+import { select } from "@/utils/prompts";
 
 export class AutomaticLoginTool extends BaseTool {
   constructor() {
@@ -149,30 +150,6 @@ export class AutomaticLoginTool extends BaseTool {
         return {
           success: false,
           message: "Operation cancelled - no login mode selected",
-        };
-      }
-
-      const instanceCount = allClones.length;
-      const cookieCount =
-        loginMode === "first-cookie"
-          ? 1
-          : loginMode === "per-device"
-            ? readyDevices.length
-            : Math.min(cookies.length, instanceCount);
-
-      const shouldProceed = await confirm({
-        message: `Login to ${colors.bold(
-          instanceCount.toString()
-        )} Roblox instance(s) across ${colors.bold(
-          readyDevices.length.toString()
-        )} device(s) using ${colors.bold(cookieCount.toString())} cookie(s)?`,
-      });
-
-      if (!shouldProceed) {
-        outro(colors.yellow("Operation cancelled"));
-        return {
-          success: false,
-          message: "Operation cancelled by user",
         };
       }
 

@@ -1,8 +1,9 @@
-import { select, text } from "@clack/prompts";
+import { text } from "@clack/prompts";
 import colors from "picocolors";
-import { getLDPlayerInstances, type LDPlayerInstance } from "@/utils/ld";
+import { getLDPlayerInstances, type LDPlayerInstance } from "@/utils/emu/ld";
 import { Logger } from "@/utils/logger";
 import type { CloneConfiguration } from "./types";
+import { select } from "@/utils/prompts";
 
 export async function loadInstances(
   ldPath: string

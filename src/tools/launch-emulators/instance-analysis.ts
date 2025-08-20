@@ -1,16 +1,19 @@
 import colors from "picocolors";
-import { printInstancesList, type LDPlayerInstance } from "@/utils/ld";
 import { Logger } from "@/utils/logger";
+import type {
+  EmulatorInstance,
+  EmulatorService,
+} from "@/utils/emu/abstraction";
 
 export interface InstanceAnalysis {
-  allInstances: LDPlayerInstance[];
-  stoppedInstances: LDPlayerInstance[];
-  runningInstances: LDPlayerInstance[];
+  allInstances: EmulatorInstance[];
+  stoppedInstances: EmulatorInstance[];
+  runningInstances: EmulatorInstance[];
   needsLaunch: boolean;
 }
 
 export function analyzeInstances(
-  instances: LDPlayerInstance[]
+  instances: EmulatorInstance[]
 ): InstanceAnalysis {
   const stoppedInstances = instances.filter(
     (instance) => instance.status === "Stopped"
@@ -27,8 +30,11 @@ export function analyzeInstances(
   };
 }
 
-export function displayInstanceAnalysis(analysis: InstanceAnalysis): void {
-  printInstancesList(analysis.allInstances);
+export function displayInstanceAnalysis(
+  analysis: InstanceAnalysis,
+  emulatorService: EmulatorService
+): void {
+  emulatorService.printInstancesList(analysis.allInstances);
 
   if (!analysis.needsLaunch) {
     Logger.success("All instances are already running!", { spaceBefore: true });

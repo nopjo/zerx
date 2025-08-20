@@ -37,6 +37,9 @@ export interface UsernameGameAssignment {
 
 export interface Config {
   ldPlayerPath?: string;
+  mumuPath?: string;
+  emulatorType?: "ldplayer" | "mumu";
+  inputMethod?: "arrows" | "numbers";
   robloxLauncher?: RobloxLauncherConfig;
 }
 
