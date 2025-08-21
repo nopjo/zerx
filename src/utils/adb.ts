@@ -36,10 +36,45 @@ async function getRunningEmulatorPorts(): Promise<number[]> {
   }
 }
 
-async function connectToExtendedEmulators(): Promise<void> {
+async function testDeviceConnection(port: number): Promise<AdbDevice | null> {
+  const deviceId = `localhost:${port}`;
+
+  try {
+    await execAsync(`adb connect ${deviceId}`, { timeout: 3000 });
+
+    const { stdout: statusOutput } = await execAsync(
+      `adb -s ${deviceId} shell echo "test"`,
+      { timeout: 2000 }
+    );
+
+    if (!statusOutput.includes("test")) {
+      return null;
+    }
+
+    let model: string | undefined;
+    try {
+      const { stdout: modelOutput } = await execAsync(
+        `adb -s ${deviceId} shell getprop ro.product.model`,
+        { timeout: 2000 }
+      );
+      model = modelOutput.trim() || undefined;
+    } catch {}
+
+    return {
+      id: deviceId,
+      status: "device",
+      model,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function connectToAllEmulators(): Promise<void> {
   const runningPorts = await getRunningEmulatorPorts();
 
   if (runningPorts.length === 0) {
+    Logger.muted("No emulator ports detected");
     return;
   }
 
@@ -47,75 +82,63 @@ async function connectToExtendedEmulators(): Promise<void> {
     `Found ${runningPorts.length} potential emulator ports: ${runningPorts.join(", ")}`
   );
 
-  const currentDevices = new Set<string>();
-  try {
-    const { stdout } = await execAsync("adb devices");
-    const lines = stdout.split("\n").slice(1);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("*")) {
-        const deviceId = trimmed.split(/\s+/)[0];
-        if (deviceId) {
-          currentDevices.add(deviceId);
-        }
-      }
-    }
-  } catch {}
+  const batchSize = 5;
+  const results: (number | null)[] = [];
 
-  const connectPromises = runningPorts
-    .filter((port) => {
-      const deviceId = `emulator-${port - 1}`;
-      const localhostId = `localhost:${port}`;
-      return !currentDevices.has(deviceId) && !currentDevices.has(localhostId);
-    })
-    .map(async (port) => {
+  for (let i = 0; i < runningPorts.length; i += batchSize) {
+    const batch = runningPorts.slice(i, i + batchSize);
+
+    const batchPromises = batch.map(async (port) => {
       try {
-        await execAsync(`adb connect localhost:${port}`, { timeout: 5000 });
+        await execAsync(`adb connect localhost:${port}`, { timeout: 3000 });
+        Logger.muted(`✓ Connected to localhost:${port}`);
         return port;
       } catch {
+        Logger.muted(`✗ Failed to connect to localhost:${port}`);
         return null;
       }
     });
 
-  const results = await Promise.all(connectPromises);
-  const connectedPorts = results.filter((port) => port !== null);
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+  }
 
-  if (connectedPorts.length > 0) {
+  const successfulConnections = results.filter((port) => port !== null);
+
+  if (successfulConnections.length > 0) {
     Logger.muted(
-      `Successfully connected to ${connectedPorts.length} additional emulators`
+      `Successfully connected to ${successfulConnections.length}/${runningPorts.length} emulators`
     );
   }
 }
 
 export async function getConnectedDevices(): Promise<AdbDevice[]> {
   try {
-    await connectToExtendedEmulators();
-    const { stdout } = await execAsync("adb devices -l");
-    const lines = stdout.split("\n").slice(1);
+    await connectToAllEmulators();
 
-    const devices: AdbDevice[] = [];
+    const runningPorts = await getRunningEmulatorPorts();
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("*")) {
-        const parts = trimmed.split(/\s+/);
-        if (parts.length >= 2) {
-          const device: AdbDevice = {
-            id: parts[0]!,
-            status: parts[1]!,
-          };
-
-          const modelMatch = trimmed.match(/model:([^\s]+)/);
-          if (modelMatch) {
-            device.model = modelMatch[1];
-          }
-
-          devices.push(device);
-        }
-      }
+    if (runningPorts.length === 0) {
+      Logger.muted("No emulator ports found");
+      return [];
     }
 
-    return devices;
+    Logger.muted(`Testing ${runningPorts.length} emulator connections...`);
+
+    const devicePromises = runningPorts.map((port) =>
+      testDeviceConnection(port)
+    );
+    const deviceResults = await Promise.all(devicePromises);
+
+    const connectedDevices = deviceResults.filter(
+      (device): device is AdbDevice => device !== null
+    );
+
+    Logger.muted(
+      `${connectedDevices.length}/${runningPorts.length} devices are responsive`
+    );
+
+    return connectedDevices;
   } catch (error) {
     Logger.error("[X] Error getting ADB devices:");
     console.error(error);
@@ -127,22 +150,22 @@ export function printConnectedDevices(devices: AdbDevice[]): void {
   Logger.title("[-] Connected Devices:");
 
   if (devices.length === 0) {
-    Logger.warning("[!] No devices found");
-    Logger.muted("Make sure you have some devices running.", { indent: 1 });
+    Logger.warning("[!] No responsive devices found");
+    Logger.muted("Make sure you have emulators running and ADB is working.", {
+      indent: 1,
+    });
     return;
   }
 
   devices.forEach((device, index) => {
-    const statusColor =
-      device.status === "device"
-        ? colors.green
-        : device.status === "unauthorized"
-          ? colors.yellow
-          : colors.red;
+    const portMatch = device.id.match(/localhost:(\d+)/);
+    const port = portMatch ? portMatch[1] : device.id;
 
     const deviceInfo = device.model
       ? `${device.id} (${device.model})`
       : device.id;
+
+    const statusColor = device.status === "device" ? colors.green : colors.red;
 
     Logger.muted(
       `${index + 1}. ${colors.white(deviceInfo)} - ${statusColor(colors.bold(device.status))}`,
@@ -150,8 +173,11 @@ export function printConnectedDevices(devices: AdbDevice[]): void {
     );
   });
 
-  Logger.muted(`Total: ${colors.white(devices.length.toString())} device(s)`, {
-    indent: 1,
-    spaceBefore: true,
-  });
+  Logger.muted(
+    `Total: ${colors.white(devices.length.toString())} responsive device(s)`,
+    {
+      indent: 1,
+      spaceBefore: true,
+    }
+  );
 }
