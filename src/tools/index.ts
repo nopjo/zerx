@@ -117,7 +117,7 @@ export async function runTool(): Promise<void> {
       colors.bold(
         colors.magenta("[*] ") +
           colors.cyan("zerx.lol") +
-          colors.gray(" v1.2.0") +
+          colors.gray(" v1.2.3") +
           colors.white(" - ") +
           colors.green(emulatorName + "\n")
       )
