@@ -16,14 +16,30 @@ async function execLDCommand(
     const fullCommand = `"${ldPath}" ${command}`;
     return await execAsync(fullCommand);
   } catch (error: any) {
-    if (error.stderr && error.stderr.trim()) {
+    if (
+      error.stderr &&
+      error.stderr.trim() &&
+      !error.stderr.includes("successfully")
+    ) {
       throw new Error(`LDConsole command failed: ${error.stderr}`);
-    } else if (
+    }
+
+    if (
+      error.stdout ||
+      command.includes("copy") ||
+      command.includes("restore") ||
+      command.includes("rename")
+    ) {
+      return { stdout: error.stdout || "", stderr: error.stderr || "" };
+    }
+
+    if (
       error.message &&
-      !error.message.includes("Command failed with exit code 0")
+      !error.message.includes("Command failed with exit code")
     ) {
       throw new Error(`LDConsole command failed: ${error.message}`);
     }
+
     return { stdout: error.stdout || "", stderr: error.stderr || "" };
   }
 }
@@ -44,11 +60,19 @@ export async function createSingleClone(
   try {
     const tempName = `temp_clone_${Date.now()}_${cloneIndex}`;
 
-    await execLDCommand(
-      ldPath,
-      `copy --name "${tempName}" --from ${sourceInstance.index}`
-    );
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      await execLDCommand(
+        ldPath,
+        `copy --name "${tempName}" --from ${sourceInstance.index}`
+      );
+    } catch (error) {
+      Logger.muted(
+        `Copy command returned error, checking if instance was created...`,
+        { indent: 1 }
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const { stdout } = await execLDCommand(ldPath, "list2");
     const lines = stdout.split("\n").filter((line) => line.trim());
@@ -63,11 +87,13 @@ export async function createSingleClone(
     }
 
     if (newInstanceIndex === null) {
-      throw new Error(`Failed to find newly created instance "${tempName}"`);
+      throw new Error(
+        `Failed to find newly created instance "${tempName}" - copy may have failed`
+      );
     }
 
     cloneStepSpinner.message(
-      colors.gray(`Restoring backup to ${cloneName}...`)
+      colors.gray(`✓ Instance created, restoring backup to ${cloneName}...`)
     );
     await execLDCommand(
       ldPath,
