@@ -15,6 +15,8 @@ import { select } from "@/utils/prompts";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
 import { importMuMuBackup } from "@/utils/emu/mumu";
+import { getLDPlayerPath, type LDPlayerInstance } from "@/utils/emu/ld";
+import { executeCloneProcess } from "./clone-process";
 
 export interface CloneConfiguration {
   sourceInstance: EmulatorInstance;
@@ -55,62 +57,242 @@ export class CloneVMTool extends BaseTool {
     }
 
     try {
-      const emulatorService = getEmulatorService(context.emulatorType);
-      const emulatorName =
-        context.emulatorType === "mumu" ? "MuMu Player" : "LDPlayer";
-
-      const emulatorPath = await emulatorService.getPath();
-      if (!emulatorPath) {
-        outro(colors.yellow("[!] Operation cancelled"));
-        return { success: false, message: `No ${emulatorName} path specified` };
+      if (context.emulatorType === "ldplayer") {
+        return await this.executeLDPlayerCloning(context);
+      } else {
+        return await this.executeMuMuCloning(context);
       }
-      Logger.success(`[+] Using ${emulatorName} at: ${emulatorPath}`);
-
-      const loadingSpinner = spinner();
-      loadingSpinner.start(colors.gray(`Loading ${emulatorName} instances...`));
-
-      const instances = await emulatorService.getInstances();
-      loadingSpinner.stop(colors.green("[+] Instances loaded"));
-
-      if (instances.length === 0) {
-        outro(
-          colors.red(
-            `[X] No ${emulatorName} instances found. Create some instances first.`
-          )
-        );
-        return {
-          success: false,
-          message: `No ${emulatorName} instances found`,
-        };
-      }
-
-      this.displayInstances(instances, emulatorName);
-
-      const config = await this.getConfiguration(instances);
-      if (!config) {
-        outro(colors.yellow("[!] Operation cancelled"));
-        return { success: false, message: "Operation cancelled" };
-      }
-
-      const shouldProceed = await confirm({
-        message: `Create ${colors.bold(config.cloneCount.toString())} clone(s) of ${colors.bold(config.sourceInstance.name)}?`,
-      });
-
-      if (!shouldProceed) {
-        outro(colors.yellow("[!] Operation cancelled"));
-        return { success: false, message: "Operation cancelled by user" };
-      }
-
-      return await this.executeCloning(
-        emulatorService,
-        context.emulatorType,
-        config
-      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       outro(colors.red(`[X] Unexpected error: ${errorMessage}`));
       return { success: false, message: `Unexpected error: ${errorMessage}` };
+    }
+  }
+
+  private async executeLDPlayerCloning(
+    context: ToolRunContext
+  ): Promise<ToolResult> {
+    const ldPath = await getLDPlayerPath();
+    if (!ldPath) {
+      outro(colors.yellow("[!] Operation cancelled"));
+      return { success: false, message: "No LDPlayer path specified" };
+    }
+    Logger.success(`[+] Using LDPlayer at: ${ldPath}`);
+
+    const { exec } = require("child_process");
+    const { promisify } = require("util");
+    const execAsync = promisify(exec);
+
+    const loadingSpinner = spinner();
+    loadingSpinner.start(colors.gray("Loading LDPlayer instances..."));
+
+    let instances: EmulatorInstance[] = [];
+    try {
+      const { stdout } = await execAsync(`"${ldPath}" list2`);
+      const lines = stdout.split("\n").filter((line: string) => line.trim());
+
+      for (const line of lines) {
+        const parts = line.split(",");
+        if (
+          parts.length >= 3 &&
+          parts[0] &&
+          parts[1] &&
+          parts[2] !== undefined
+        ) {
+          const index = parseInt(parts[0]);
+          const name = parts[1].trim();
+          const pidStr = parts[2];
+          const status = pidStr && pidStr !== "0" ? "Running" : "Stopped";
+
+          if (!isNaN(index) && name) {
+            instances.push({
+              index: index,
+              name: name,
+              status: status,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      loadingSpinner.stop(colors.red("[X] Failed to load instances"));
+      return { success: false, message: "Failed to load LDPlayer instances" };
+    }
+
+    loadingSpinner.stop(colors.green("[+] Instances loaded"));
+
+    if (instances.length === 0) {
+      outro(
+        colors.red(
+          "[X] No LDPlayer instances found. Create some instances first."
+        )
+      );
+      return { success: false, message: "No LDPlayer instances found" };
+    }
+
+    this.displayInstances(instances, "LDPlayer");
+
+    const config = await this.getConfiguration(instances);
+    if (!config) {
+      outro(colors.yellow("[!] Operation cancelled"));
+      return { success: false, message: "Operation cancelled" };
+    }
+
+    const shouldProceed = await confirm({
+      message: `Create ${colors.bold(config.cloneCount.toString())} clone(s) of ${colors.bold(config.sourceInstance.name)}?`,
+    });
+
+    if (!shouldProceed) {
+      outro(colors.yellow("[!] Operation cancelled"));
+      return { success: false, message: "Operation cancelled by user" };
+    }
+
+    Logger.success("[^] Starting LDPlayer clone operation...", {
+      spaceBefore: true,
+      spaceAfter: true,
+    });
+
+    try {
+      const backupDir = path.join(process.cwd(), "ldplayer_backups");
+      if (!existsSync(backupDir)) {
+        mkdirSync(backupDir, { recursive: true });
+      }
+
+      const ldPlayerInstance: LDPlayerInstance = {
+        index: config.sourceInstance.index,
+        name: config.sourceInstance.name,
+        status: config.sourceInstance.status,
+      };
+
+      const results = await executeCloneProcess(
+        ldPath,
+        ldPlayerInstance,
+        config.newInstanceName,
+        config.cloneCount
+      );
+
+      this.displayResults(results);
+
+      const successCount = results.filter((r) => r.success).length;
+      const message = `${successCount}/${results.length} clone(s) created successfully`;
+
+      outro(colors.cyan(`[*] Clone operation finished - ${message}`));
+      return {
+        success: successCount > 0,
+        message,
+        data: { successfulClones: successCount, totalClones: results.length },
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      Logger.error("Clone operation failed", { spaceBefore: true });
+      outro(colors.red("[*] Clone operation finished with errors"));
+      return {
+        success: false,
+        message: `Clone operation failed: ${errorMessage}`,
+      };
+    }
+  }
+
+  private async executeMuMuCloning(
+    context: ToolRunContext
+  ): Promise<ToolResult> {
+    if (!context.emulatorType) {
+      return { success: false, message: "Emulator type not specified" };
+    }
+
+    const emulatorService = getEmulatorService(context.emulatorType);
+    const emulatorPath = await emulatorService.getPath();
+    if (!emulatorPath) {
+      outro(colors.yellow("[!] Operation cancelled"));
+      return { success: false, message: "No MuMu Player path specified" };
+    }
+    Logger.success(`[+] Using MuMu Player at: ${emulatorPath}`);
+
+    const loadingSpinner = spinner();
+    loadingSpinner.start(colors.gray("Loading MuMu Player instances..."));
+
+    const instances = await emulatorService.getInstances();
+    loadingSpinner.stop(colors.green("[+] Instances loaded"));
+
+    if (instances.length === 0) {
+      outro(
+        colors.red(
+          "[X] No MuMu Player instances found. Create some instances first."
+        )
+      );
+      return { success: false, message: "No MuMu Player instances found" };
+    }
+
+    this.displayInstances(instances, "MuMu Player");
+
+    const config = await this.getConfiguration(instances);
+    if (!config) {
+      outro(colors.yellow("[!] Operation cancelled"));
+      return { success: false, message: "Operation cancelled" };
+    }
+
+    const shouldProceed = await confirm({
+      message: `Create ${colors.bold(config.cloneCount.toString())} clone(s) of ${colors.bold(config.sourceInstance.name)}?`,
+    });
+
+    if (!shouldProceed) {
+      outro(colors.yellow("[!] Operation cancelled"));
+      return { success: false, message: "Operation cancelled by user" };
+    }
+
+    return await this.executeMuMuCloningProcess(emulatorService, config);
+  }
+
+  private async executeMuMuCloningProcess(
+    emulatorService: any,
+    config: CloneConfiguration
+  ): Promise<ToolResult> {
+    Logger.success("[^] Starting MuMu clone operation...", {
+      spaceBefore: true,
+      spaceAfter: true,
+    });
+
+    try {
+      const backupDir = path.join(process.cwd(), "mumu_backups");
+      if (!existsSync(backupDir)) {
+        mkdirSync(backupDir, { recursive: true });
+      }
+
+      await this.prepareSourceInstance(emulatorService, config.sourceInstance);
+
+      const backupPath = await this.createBackup(
+        emulatorService,
+        config.sourceInstance,
+        backupDir
+      );
+
+      const results = await this.createMuMuClones(
+        emulatorService,
+        config,
+        backupPath
+      );
+
+      this.displayResults(results, backupPath);
+
+      const successCount = results.filter((r) => r.success).length;
+      const message = `${successCount}/${results.length} clone(s) created successfully`;
+
+      outro(colors.cyan(`[*] Clone operation finished - ${message}`));
+      return {
+        success: successCount > 0,
+        message,
+        data: { successfulClones: successCount, totalClones: results.length },
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      Logger.error("Clone operation failed", { spaceBefore: true });
+      outro(colors.red("[*] Clone operation finished with errors"));
+      return {
+        success: false,
+        message: `Clone operation failed: ${errorMessage}`,
+      };
     }
   }
 
@@ -204,60 +386,6 @@ export class CloneVMTool extends BaseTool {
     });
   }
 
-  private async executeCloning(
-    emulatorService: any,
-    emulatorType: string,
-    config: CloneConfiguration
-  ): Promise<ToolResult> {
-    Logger.success("[^] Starting clone operation...", {
-      spaceBefore: true,
-      spaceAfter: true,
-    });
-
-    try {
-      const backupDir = path.join(process.cwd(), `${emulatorType}_backups`);
-      if (!existsSync(backupDir)) {
-        mkdirSync(backupDir, { recursive: true });
-      }
-
-      await this.prepareSourceInstance(emulatorService, config.sourceInstance);
-
-      const backupPath = await this.createBackup(
-        emulatorService,
-        config.sourceInstance,
-        backupDir
-      );
-
-      const results = await this.createClones(
-        emulatorService,
-        emulatorType,
-        config,
-        backupPath
-      );
-
-      this.displayResults(results, backupPath);
-
-      const successCount = results.filter((r) => r.success).length;
-      const message = `${successCount}/${results.length} clone(s) created successfully`;
-
-      outro(colors.cyan(`[*] Clone operation finished - ${message}`));
-      return {
-        success: successCount > 0,
-        message,
-        data: { successfulClones: successCount, totalClones: results.length },
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      Logger.error("Clone operation failed", { spaceBefore: true });
-      outro(colors.red("[*] Clone operation finished with errors"));
-      return {
-        success: false,
-        message: `Clone operation failed: ${errorMessage}`,
-      };
-    }
-  }
-
   private async prepareSourceInstance(
     emulatorService: any,
     sourceInstance: EmulatorInstance
@@ -297,139 +425,71 @@ export class CloneVMTool extends BaseTool {
     }
   }
 
-  private async createClones(
+  private async createMuMuClones(
     emulatorService: any,
-    emulatorType: string,
     config: CloneConfiguration,
     backupPath: string
   ): Promise<CloneResult[]> {
     const results: CloneResult[] = [];
 
-    if (emulatorType === "mumu") {
-      const cloneSpinner = spinner();
-      cloneSpinner.start(
-        colors.gray(`Creating ${config.cloneCount} clone(s)...`)
+    const cloneSpinner = spinner();
+    cloneSpinner.start(
+      colors.gray(`Creating ${config.cloneCount} clone(s)...`)
+    );
+
+    try {
+      await importMuMuBackup(backupPath, config.cloneCount);
+      cloneSpinner.stop(
+        colors.green(`[+] ${config.cloneCount} clone(s) created`)
       );
 
-      try {
-        await importMuMuBackup(backupPath, config.cloneCount);
-        cloneSpinner.stop(
-          colors.green(`[+] ${config.cloneCount} clone(s) created`)
-        );
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const instances = await emulatorService.getInstances();
+      const newInstances = instances.slice(-config.cloneCount);
 
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        const instances = await emulatorService.getInstances();
-        const newInstances = instances.slice(-config.cloneCount);
+      for (let i = 0; i < newInstances.length; i++) {
+        const cloneName =
+          config.cloneCount === 1
+            ? config.newInstanceName
+            : `${config.newInstanceName}-${i + 1}`;
 
-        for (let i = 0; i < newInstances.length; i++) {
-          const cloneName =
-            config.cloneCount === 1
-              ? config.newInstanceName
-              : `${config.newInstanceName}-${i + 1}`;
-
-          try {
-            await emulatorService.renameInstance(
-              newInstances[i].index,
-              cloneName
-            );
-            results.push({ cloneName, success: true });
-          } catch (error) {
-            results.push({
-              cloneName,
-              success: false,
-              error: error instanceof Error ? error.message : "Rename failed",
-            });
-          }
-        }
-      } catch (error) {
-        cloneSpinner.stop(colors.red("[X] Clone creation failed"));
-        for (let i = 1; i <= config.cloneCount; i++) {
-          const cloneName =
-            config.cloneCount === 1
-              ? config.newInstanceName
-              : `${config.newInstanceName}-${i}`;
+        try {
+          await emulatorService.renameInstance(
+            newInstances[i].index,
+            cloneName
+          );
+          results.push({ cloneName, success: true });
+        } catch (error) {
           results.push({
             cloneName,
             success: false,
-            error: error instanceof Error ? error.message : "Import failed",
+            error: error instanceof Error ? error.message : "Rename failed",
           });
         }
       }
-    } else {
+    } catch (error) {
+      cloneSpinner.stop(colors.red("[X] Clone creation failed"));
       for (let i = 1; i <= config.cloneCount; i++) {
         const cloneName =
           config.cloneCount === 1
             ? config.newInstanceName
             : `${config.newInstanceName}-${i}`;
-
-        const result = await this.createSingleClone(
-          emulatorService,
-          config.sourceInstance,
+        results.push({
           cloneName,
-          i,
-          config.cloneCount
-        );
-        results.push(result);
+          success: false,
+          error: error instanceof Error ? error.message : "Import failed",
+        });
       }
     }
 
     return results;
   }
 
-  private async createSingleClone(
-    emulatorService: any,
-    sourceInstance: EmulatorInstance,
-    cloneName: string,
-    cloneIndex: number,
-    totalClones: number
-  ): Promise<CloneResult> {
-    const cloneSpinner = spinner();
-    cloneSpinner.start(
-      colors.gray(
-        `Creating clone ${cloneIndex}/${totalClones}: ${cloneName}...`
-      )
-    );
-
-    try {
-      const instancesBefore: EmulatorInstance[] =
-        await emulatorService.getInstances();
-
-      await emulatorService.cloneInstance(sourceInstance.index);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      const instancesAfter: EmulatorInstance[] =
-        await emulatorService.getInstances();
-
-      const newInstance: EmulatorInstance | undefined = instancesAfter.find(
-        (after: EmulatorInstance) =>
-          !instancesBefore.some(
-            (before: EmulatorInstance) => before.index === after.index
-          )
-      );
-
-      if (!newInstance) {
-        throw new Error("Could not find newly created instance");
-      }
-
-      await emulatorService.renameInstance(newInstance.index, cloneName);
-
-      cloneSpinner.stop(
-        colors.green(`[+] Clone ${cloneIndex} created: ${cloneName}`)
-      );
-      return { cloneName, success: true };
-    } catch (error) {
-      cloneSpinner.stop(colors.red(`[X] Failed to create clone ${cloneIndex}`));
-      return {
-        cloneName,
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  }
-
-  private displayResults(results: CloneResult[], backupPath: string): void {
+  private displayResults(results: CloneResult[], backupPath?: string): void {
     Logger.success("Clone operation completed!", { spaceBefore: true });
-    Logger.muted(`Backup saved: ${backupPath}`, { indent: 1 });
+    if (backupPath) {
+      Logger.muted(`Backup saved: ${backupPath}`, { indent: 1 });
+    }
 
     const successful = results.filter((r) => r.success);
     const failed = results.filter((r) => !r.success);
